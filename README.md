@@ -2,6 +2,16 @@
 
 ## installation
 
+### Yade
+
+```
+sudo apt-get install yade
+# Yade ausführen:
+yade
+# Python script mit yade ausführen
+yade script.py
+```
+
 ### Mit dem Blender Python Interpreter:
 ```
 cd C:\Program Files\Blender Foundation\Blender 2.91\2.91\python>
