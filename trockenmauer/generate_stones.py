@@ -34,3 +34,18 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
     v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
                   [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
     return Stone(v, name)
+
+
+def add_noise_to_vertices(vert, s=0.1):
+    """
+    Adds noise to the vertices (to each coordinate separately)
+
+    :param vert:
+    :param type:
+    :return:
+    """
+    for v in vert:
+        for c in v:
+            c += random.gauss(0, s)
+
+    return Stone(vert, f'Noisy vertices')
