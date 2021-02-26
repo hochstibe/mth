@@ -1,41 +1,13 @@
 # FHNW - Institut für Geomatik: Masterthesis 
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 25.02.2021
-# synth_stone.py -
-
-import random
+# stone.py -
 
 import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
 
 from .utils import set_axes_equal
-
-
-def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
-                           x_noise: float = 0.1, y_noise: float = 0.05, z_noise: float = 0.05,
-                           name: str = '') -> 'Stone':
-    """
-    Stone generator for target size (in meter), uniform noise
-
-    :param x: target length in x-direction
-    :param y: target length in y-direction
-    :param z: target length in z-direction
-    :param scale: apply a scaling-factor to all three directions
-    :param x_noise:
-    :param y_noise:
-    :param z_noise:
-    :return:
-    """
-
-    # Coordinates of one corner (first quadrant, all coordinates positive)
-    x = scale * random.uniform(x - x_noise, x + x_noise) / 2
-    y = scale * random.uniform(y - y_noise, y + y_noise) / 2
-    z = scale * random.uniform(z - z_noise, z + z_noise) / 2
-
-    v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
-                  [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
-    return Stone(v, name)
 
 
 class Stone:
@@ -54,7 +26,7 @@ class Stone:
         eigenvalue_orig, eigenvector_orig = self.ordered_pca(vertices)
         r = self.rot_matrix(eigenvector_orig)
 
-        self.vertices = self.transform2origin(vertices, r)
+        self.vertices, self.center = self.transform2origin(vertices, r)
 
     @staticmethod
     def pca(vert):
@@ -118,13 +90,13 @@ class Stone:
         Calculate the center of mass of a given set of vertices (uniform mass distribution)
         :param vert: collection of vertices
         :param r: rotation matrix
-        :return:
+        :return: Transformed vertices and the center (new) center
         """
         vert_rot = np.matmul(vert, r)
         # calculate the center (mean of each coordinates)
         m = np.mean(vert_rot, axis=0)
         # shift the center to the origin (0, 0, 0)
-        return vert_rot - m
+        return vert_rot - m, np.array([0, 0, 0])
 
     def add_plot_to_ax(self, ax):
         # Plot the points
@@ -162,34 +134,8 @@ class Stone:
         :return:
         """
 
-        fig = plt.figure()
+        # fig = plt.figure()
         ax = plt.axes(projection='3d')
-        # Plot the points
-        # ax.plot3D(self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2], 'g.')
-        # # ax.plot3D(np.append(u[:, 0], u[0, 0]), np.append(u[:, 1], u[0, 1]), np.append(u[:, 2], u[0, 2]), 'gray')
-
-        # # The stones are already aligned to the coordinate axis and centered in (0, 0, 0)
-        # # calculating the mean and placing the eigenvectors at the mean is not necessary
-        # mean = np.mean(self.vertices, axis=0)
-
-        # # Plot the center
-        # ax.plot3D(mean[0], mean[1], mean[2], 'r.')
-
-        # eigenvalues, eigenvectors = self.pca(self.vertices)
-
-        # # Plot the three axes of the stone
-        # for val, vec in zip(eigenvalues, eigenvectors):
-        #     v = np.sqrt(val)
-        #     cx, cy, cz = mean  # center coordinates
-        #     x, y, z = vec  # components of the eigenvector
-        #     ax.plot3D([cx, cx + v*x], [cy, cy + v*y], [cz, cz + v*z], 'r')
-
-        #     ax.text(cx + v*x, cy + v*y, cz + v*z, np.round(v, 2), 'x')
-
-        # ax.set_xlabel('x')
-        # ax.set_ylabel('y')
-        # ax.set_zlabel('z')
-        # set_axes_equal(ax)
         self.add_plot_to_ax(ax)
         plt.show()
 
