@@ -1,7 +1,7 @@
 # FHNW - Institut für Geomatik: Masterthesis 
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
-# Stefan Hochuli, 26.02.2021
-# generate_stones.py -
+# Stefan Hochuli, 26.02.2021, generate_stones.py
+#
 
 import random
 
@@ -12,7 +12,7 @@ from trockenmauer.stone import Stone
 
 def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
                            x_noise: float = 0.1, y_noise: float = 0.05, z_noise: float = 0.05,
-                           name: str = '') -> 'Stone':
+                           name: str = None) -> 'Stone':
     """
     Stone generator for target size (in meter), uniform noise
 
@@ -33,7 +33,9 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
 
     v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
                   [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
-    return Stone(v, name)
+    if name:
+        return Stone(v, name)
+    return Stone(v)
 
 
 def add_noise_to_vertices(vert, s=0.1):
