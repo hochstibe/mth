@@ -3,12 +3,14 @@
 # Stefan Hochuli, 26.02.2021
 # plot.py -
 
+from typing import List
+
 import matplotlib.pyplot as plt
 
 from .stone import Stone
 
 
-def plot_stones(stones: list[Stone]):
+def plot_stones(stones: List[Stone]):
     """
     Plot all stones in separate subplots
 

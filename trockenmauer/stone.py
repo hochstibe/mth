@@ -4,7 +4,6 @@
 # stone.py -
 
 import numpy as np
-import numpy.typing as npt
 import matplotlib.pyplot as plt
 
 from .utils import set_axes_equal
@@ -16,7 +15,7 @@ class Stone:
     length in x-direction, width in y-direction, height in z-direction
     """
 
-    def __init__(self, vertices: npt.ArrayLike, name: str = ''):
+    def __init__(self, vertices: np.ndarray, name: str = ''):
         self.name = name
         # Array of shape (n, 3)
         self.vertices_orig = vertices  # store orig for debugging purposes, discard later
@@ -61,7 +60,7 @@ class Stone:
 
     # Calculate the rotation matrix
     @staticmethod
-    def rot_matrix(e_vec: npt.ArrayLike,
+    def rot_matrix(e_vec: np.ndarray,
                    x=np.array([1, 0, 0]), y=np.array([0, 1, 0]), z=np.array([0, 0, 1])) -> np.ndarray:
         """
         Calculates the rotation matrix from the three eigenvectors to the coordinate axis.
