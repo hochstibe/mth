@@ -1,8 +1,7 @@
 # FHNW - Institut für Geomatik: Masterthesis 
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 25.02.2021
-# synth_stone.py
-# Desc:
+# synth_stone.py -
 
 import random
 
@@ -14,7 +13,8 @@ from .utils import set_axes_equal
 
 
 def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
-                           x_noise: float = 0.1, y_noise: float = 0.05, z_noise: float = 0.05) -> 'Stone':
+                           x_noise: float = 0.1, y_noise: float = 0.05, z_noise: float = 0.05,
+                           name: str = '') -> 'Stone':
     """
     Stone generator for target size (in meter), uniform noise
 
@@ -35,7 +35,7 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
 
     v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
                   [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
-    return Stone(v)
+    return Stone(v, name)
 
 
 class Stone:
@@ -44,7 +44,8 @@ class Stone:
     length in x-direction, width in y-direction, height in z-direction
     """
 
-    def __init__(self, vertices: npt.ArrayLike):
+    def __init__(self, vertices: npt.ArrayLike, name: str = ''):
+        self.name = name
         # Array of shape (n, 3)
         self.vertices_orig = vertices  # store orig for debugging purposes, discard later
         if vertices.shape[1] != 3:
@@ -125,14 +126,7 @@ class Stone:
         # shift the center to the origin (0, 0, 0)
         return vert_rot - m
 
-    def plot(self):
-        """
-        Plot the stone
-        :return:
-        """
-
-        fig = plt.figure()
-        ax = plt.axes(projection='3d')
+    def add_plot_to_ax(self, ax):
         # Plot the points
         ax.plot3D(self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2], 'g.')
         # ax.plot3D(np.append(u[:, 0], u[0, 0]), np.append(u[:, 1], u[0, 1]), np.append(u[:, 2], u[0, 2]), 'gray')
@@ -159,4 +153,45 @@ class Stone:
         ax.set_ylabel('y')
         ax.set_zlabel('z')
         set_axes_equal(ax)
+
+        return ax
+
+    def plot(self):
+        """
+        Plot the stone
+        :return:
+        """
+
+        fig = plt.figure()
+        ax = plt.axes(projection='3d')
+        # Plot the points
+        # ax.plot3D(self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2], 'g.')
+        # # ax.plot3D(np.append(u[:, 0], u[0, 0]), np.append(u[:, 1], u[0, 1]), np.append(u[:, 2], u[0, 2]), 'gray')
+
+        # # The stones are already aligned to the coordinate axis and centered in (0, 0, 0)
+        # # calculating the mean and placing the eigenvectors at the mean is not necessary
+        # mean = np.mean(self.vertices, axis=0)
+
+        # # Plot the center
+        # ax.plot3D(mean[0], mean[1], mean[2], 'r.')
+
+        # eigenvalues, eigenvectors = self.pca(self.vertices)
+
+        # # Plot the three axes of the stone
+        # for val, vec in zip(eigenvalues, eigenvectors):
+        #     v = np.sqrt(val)
+        #     cx, cy, cz = mean  # center coordinates
+        #     x, y, z = vec  # components of the eigenvector
+        #     ax.plot3D([cx, cx + v*x], [cy, cy + v*y], [cz, cz + v*z], 'r')
+
+        #     ax.text(cx + v*x, cy + v*y, cz + v*z, np.round(v, 2), 'x')
+
+        # ax.set_xlabel('x')
+        # ax.set_ylabel('y')
+        # ax.set_zlabel('z')
+        # set_axes_equal(ax)
+        self.add_plot_to_ax(ax)
         plt.show()
+
+    def __repr__(self):
+        return f'<Stone(name={self.name}, vertices={len(self.vertices)})>'
