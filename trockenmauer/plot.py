@@ -1,4 +1,4 @@
-# FHNW - Institut für Geomatik: Masterthesis 
+# FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 26.02.2021, plot.py
 #

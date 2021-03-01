@@ -16,7 +16,7 @@ from trockenmauer.stone import Stone
 def random_points(n):
     points = list()
     for i in range(n):
-        points.append([3*(random.random()+1), 3*(random.random()+2), 3*(random.random()+3)])
+        points.append([3*(random.random()+1), 2*(random.random()+2), 1*(random.random()+3)])
     return np.array(points)
 
 
@@ -32,4 +32,3 @@ ax = fig.add_subplot(122, projection='3d')
 stone.add_plot_to_ax(ax)
 ax.set_title('rotated')
 plt.show()
-

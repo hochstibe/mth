@@ -1,4 +1,4 @@
-# FHNW - Institut für Geomatik: Masterthesis 
+# FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 26.02.2021, generate_stones.py
 #
@@ -50,4 +50,4 @@ def add_noise_to_vertices(vert, s=0.1):
         for c in v:
             c += random.gauss(0, s)
 
-    return Stone(vert, f'Noisy vertices')
+    return Stone(vert, 'Noisy vertices')

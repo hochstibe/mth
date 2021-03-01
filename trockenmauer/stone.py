@@ -1,4 +1,4 @@
-# FHNW - Institut für Geomatik: Masterthesis 
+# FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 25.02.2021, stone.py
 #
@@ -53,7 +53,8 @@ class Stone:
     @staticmethod
     def pca(vert: np.ndarray):
         """
-        Calculates the principal component analysis of vertices (n, 3) and returns the eigenvalue and eigenvectors
+        Calculates the principal component analysis of vertices (n, 3)
+        and returns the eigenvalue and eigenvectors
 
         :param vert: collection of vertices
         :return: eigenvalues, eigenvectors
@@ -66,13 +67,16 @@ class Stone:
     # Calculate the rotation matrix from eigenvectors (basis) to a new basis (coordinate axis)
     @staticmethod
     def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
-                   x: np.ndarray = None, y: np.ndarray = None, z: np.ndarray = None) -> np.ndarray:
+                   x: np.ndarray = None, y: np.ndarray = None, z: np.ndarray = None
+                   ) -> np.ndarray:
         """
-        Calculates the rotation matrix from the three eigenvectors to the three axis x, y, z.
-        If an order of the eigenvectors is given (descending), the rotation is defined,
-        that the strongest eigenvector is rotated to the x-axis and so on.
-        If the rotation is from the eigenvectors to the respective coordinate system, the eigenvectors are
-        by definition the rotation matrix. For an arbitrary new basis, it solves the linear matrix equation
+        Calculates the rotation matrix from the three eigenvectors
+        to the three axis x, y, z.
+        If an order of the eigenvectors is given (descending), the strongest
+        eigenvector is rotated to the x-axis, the weakest to the z-axis.
+        If the rotation is from the eigenvectors to the respective coordinate
+        system, the eigenvectors are by definition the rotation matrix.
+        For an arbitrary new basis, it solves the linear matrix equation
         ``ax=b`` with the (ordered) eigenvectors ``(e1, e2, e3)`` as ``a``,
         the new basis ``(x, y, z)`` as ``b``::
 
@@ -84,7 +88,8 @@ class Stone:
            reshape x(9, 1) to R(3, 3)
 
         :param e_vec: Array of the three (ordered) eigenvectors
-        :param order: order of the eigenvectors (ascending). With the default values, no ordering is applied
+        :param order: order of the eigenvectors (ascending). With the default values,
+                      no ordering is applied
         :param x: x-axis: length will be transformed to this axis; np.array([1, 0, 0])
         :param y: y-axis: width will be transformed to this axis; np.array([0, 1, 0])
         :param z: z-axis: height will be transformed to this axis; np.array([0, 0, 1])
@@ -135,7 +140,6 @@ class Stone:
             vert = self.vertices
         # Plot the points
         ax.plot3D(vert[:, 0], vert[:, 1], vert[:, 2], 'g.')
-        # ax.plot3D(np.append(u[:, 0], u[0, 0]), np.append(u[:, 1], u[0, 1]), np.append(u[:, 2], u[0, 2]), 'gray')
 
         # The stones are already aligned to the coordinate axis and centered in (0, 0, 0)
         # calculating the mean and placing the eigenvectors at the mean is not necessary
@@ -150,10 +154,13 @@ class Stone:
         for val, vec in zip(eigenvalues, eigenvectors):
             v = val
             cx, cy, cz = mean  # center coordinates
+
             # components of the eigenvector
-            if positive_eigenvec:  # use positive eigenvectors e_vec can direct wrong direction (180°)
+            # use positive eigenvectors (e_vec can direct wrong direction (180°))
+            if positive_eigenvec:
                 x, y, z = np.sign(vec)*vec
-            else:  # use the correct direction of eigenvectors
+            # use the correct direction of eigenvectors
+            else:
                 x, y, z = vec
             ax.plot3D([cx, cx + v*x], [cy, cy + v*y], [cz, cz + v*z], 'r')
 
