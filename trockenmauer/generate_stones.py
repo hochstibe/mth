@@ -23,6 +23,7 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: float = 1,
     :param x_noise:
     :param y_noise:
     :param z_noise:
+    :param name:
     :return:
     """
 
@@ -43,7 +44,7 @@ def add_noise_to_vertices(vert, s=0.1):
     Adds noise to the vertices (to each coordinate separately)
 
     :param vert:
-    :param type:
+    :param s:
     :return:
     """
     for v in vert:
