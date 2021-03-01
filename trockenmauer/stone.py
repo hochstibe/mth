@@ -45,7 +45,7 @@ class Stone:
             raise ValueError('Input must be of shape (n, 3)')
 
         self.eigenvalue_orig, self.eigenvector_orig = self.pca(vertices)
-        self.order = np.argsort(self.eigenvalue_orig).tolist()
+        self.order = np.argsort(self.eigenvalue_orig)[::-1]  # decreasing from strongest to weakest
         r = self.rot_matrix(self.eigenvector_orig, order=self.order)
 
         self.vertices, self.center = self.transform2origin(vertices, r)
@@ -61,44 +61,53 @@ class Stone:
         cov_matrix = np.cov(vert.T)
         e_val, e_vec = np.linalg.eig(cov_matrix)
 
-        return e_val, e_vec
+        return np.sqrt(e_val), e_vec
 
     # Calculate the rotation matrix from eigenvectors (basis) to a new basis (coordinate axis)
     @staticmethod
-    def rot_matrix(e_vec: np.ndarray, order: List = (2, 1, 0),
-                   x=np.array([1, 0, 0]), y=np.array([0, 1, 0]), z=np.array([0, 0, 1])) -> np.ndarray:
+    def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
+                   x: np.ndarray = None, y: np.ndarray = None, z: np.ndarray = None) -> np.ndarray:
         """
-        Calculates the rotation matrix from the three eigenvectors to the coordinate axis.
-        If an order of the eigenvectors is given (ascending), the rotation is defined,
+        Calculates the rotation matrix from the three eigenvectors to the three axis x, y, z.
+        If an order of the eigenvectors is given (descending), the rotation is defined,
         that the strongest eigenvector is rotated to the x-axis and so on.
-        It solves the linear matrix equation ``ax=b`` with the (ordered) eigenvectors ``(e1, e2, e3)`` as ``a``,
-        the coordinate axis ``(x, y, z)`` as ``b``::
+        If the rotation is from the eigenvectors to the respective coordinate system, the eigenvectors are
+        by definition the rotation matrix. For an arbitrary new basis, it solves the linear matrix equation
+        ``ax=b`` with the (ordered) eigenvectors ``(e1, e2, e3)`` as ``a``,
+        the new basis ``(x, y, z)`` as ``b``::
 
-           R * e_l = x    |(el, ew, ez) (zero (3,3)) (zero (3,3))|    | a |   |x|
-           R * e_w = y -> |(zero (3,3)) (el, ew, ez) (zero (3,3))| *  |...| = |y|
-           R * e_z = z    |(zero (3,3)) (zero (3,3)) (el, ew, ez)|    | h |   |z|
+           R * e_l = x    |(e1, e1, e3) (zero (3,3)) (zero (3,3))|    | a |   |x|
+           R * e_w = y -> |(zero (3,3)) (e1, e2, e3) (zero (3,3))| *  |...| = |y|
+           R * e_h = z    |(zero (3,3)) (zero (3,3)) (e1, e2, e3)|    | h |   |z|
            (3, 3) * (3, 1) = (3, 1)  -> (9, 9) * (9, 1) = (9, 1)
 
            reshape x(9, 1) to R(3, 3)
 
         :param e_vec: Array of the three (ordered) eigenvectors
         :param order: order of the eigenvectors (ascending). With the default values, no ordering is applied
-        :param x: x-axis: length will be transformed to this axis
-        :param y: y-axis: width will be transformed to this axis
-        :param z: z-axis: height will be transformed to this axis
+        :param x: x-axis: length will be transformed to this axis; np.array([1, 0, 0])
+        :param y: y-axis: width will be transformed to this axis; np.array([0, 1, 0])
+        :param z: z-axis: height will be transformed to this axis; np.array([0, 0, 1])
         :return: Rotation matrix R (3, 3)
         """
-        # Rearrange the eigenvectors according to the given order
-        # if the default ordering is selected (2, 1, 0) orig == e_vec
-        orig = np.array([e_vec[:, order[2]], e_vec[:, order[1]], e_vec[:, order[0]]]).T
-        zero = np.zeros((3, 3))
+        # e1x e2x e3x
+        # e1y e2y e3y = e_vec
+        # e1z e2z e3z
+        # Rearrange the eigenvectors according to the given order and transpose
+        # if the default ordering is selected (0, 1, 2) orig == e_vec
+        e_vec = np.array([e_vec[:, order[0]], e_vec[:, order[1]], e_vec[:, order[2]]])
 
-        a = np.block([[orig, zero, zero],
-                      [zero, orig, zero],
-                      [zero, zero, orig]])
-        b = np.concatenate((x, y, z))
-        x = np.linalg.solve(a, b)
-        x = np.reshape(x, (3, 3)).T
+        if x and y and z:  # Rotation matrix from eigenvectors to a new basis
+            e_vec = e_vec.T
+            zero = np.zeros((3, 3))
+            a = np.block([[e_vec, zero, zero],
+                          [zero, e_vec, zero],
+                          [zero, zero, e_vec]])
+            b = np.concatenate((x, y, z))
+            x = np.linalg.solve(a, b)
+            x = np.reshape(x, (3, 3)).T  # It's correct with transpose...
+        else:  # The eigenvectors are the rotation matrix to the respective coordinate system
+            x = e_vec
         return x
 
     @staticmethod
@@ -112,14 +121,13 @@ class Stone:
         :param r: rotation matrix
         :return: Transformed vertices and the (new) center
         """
-        # Apply the rotation: R*v = v'
-        vert_rot = np.matmul(r, vert.T).T
-        # calculate the center (mean of each coordinates)
-        m = np.mean(vert_rot, axis=0)
-        # shift the center to the origin (0, 0, 0)
-        return vert_rot - m, m-m
+        # center of the vertices
+        m = np.mean(vert, axis=0)
+        # Apply the rotation to the translated vertices: R*(v-m) = v'
+        vert_rot = np.matmul(r, (vert - m).T).T
+        return vert_rot, np.zeros(3)
 
-    def add_plot_to_ax(self, ax, orig=False):
+    def add_plot_to_ax(self, ax, orig=False, positive_eigenvec=True):
 
         if orig:
             vert = self.vertices_orig
@@ -140,13 +148,16 @@ class Stone:
 
         # Plot the three axes of the stone
         for val, vec in zip(eigenvalues, eigenvectors):
-            v = np.sqrt(val)
+            v = val
             cx, cy, cz = mean  # center coordinates
-            x, y, z = vec  # components of the eigenvector
+            # components of the eigenvector
+            if positive_eigenvec:  # use positive eigenvectors e_vec can direct wrong direction (180°)
+                x, y, z = np.sign(vec)*vec
+            else:  # use the correct direction of eigenvectors
+                x, y, z = vec
             ax.plot3D([cx, cx + v*x], [cy, cy + v*y], [cz, cz + v*z], 'r')
 
             ax.text(cx + v*x, cy + v*y, cz + v*z, np.round(v, 2), 'x')
-
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')

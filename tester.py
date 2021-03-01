@@ -16,7 +16,7 @@ from trockenmauer.stone import Stone
 def random_points(n):
     points = list()
     for i in range(n):
-        points.append([random.random(), random.random(), random.random()])
+        points.append([3*(random.random()+1), 3*(random.random()+2), 3*(random.random()+3)])
     return np.array(points)
 
 
@@ -26,7 +26,7 @@ fig = plt.figure()
 fig.suptitle('Collection of stones')
 
 ax = fig.add_subplot(121, projection='3d')
-stone.add_plot_to_ax(ax, orig=True)
+stone.add_plot_to_ax(ax, orig=True, positive_eigenvec=False)
 ax.set_title('orig')
 ax = fig.add_subplot(122, projection='3d')
 stone.add_plot_to_ax(ax)
