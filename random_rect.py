@@ -1,4 +1,4 @@
-# FHNW - Institut für Geomatik: Masterthesis 
+# FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 24.02.2021, random_rect.py
 # Create and plot random regular cubes

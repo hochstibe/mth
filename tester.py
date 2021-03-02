@@ -1,4 +1,4 @@
-# FHNW - Institut für Geomatik: Masterthesis 
+# FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 26.02.21, tester.py
 #
@@ -16,7 +16,7 @@ from trockenmauer.stone import Stone
 def random_points(n):
     points = list()
     for i in range(n):
-        points.append([3*(random.random()+1), 2*(random.random()+2), 1*(random.random()+3)])
+        points.append([1*(random.random()+1), 1*(random.random()+2), 1*(random.random()+3)])
     return np.array(points)
 
 
@@ -29,6 +29,6 @@ ax = fig.add_subplot(121, projection='3d')
 stone.add_plot_to_ax(ax, orig=True, positive_eigenvec=False)
 ax.set_title('orig')
 ax = fig.add_subplot(122, projection='3d')
-stone.add_plot_to_ax(ax)
+stone.add_plot_to_ax(ax, positive_eigenvec=False)
 ax.set_title('rotated')
 plt.show()
