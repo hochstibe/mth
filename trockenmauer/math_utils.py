@@ -7,6 +7,12 @@ from typing import List
 import numpy as np
 
 
+# unit vectors
+X = np.array([1, 0, 0])
+Y = np.array([0, 1, 0])
+Z = np.array([0, 0, 1])
+
+
 # Homogenous transformation functions: adapted from Jonas Meyer
 def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3):
     """
@@ -132,7 +138,7 @@ def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
     return x
 
 
-def transform(points, r, t: np.ndarray = np.array([0, 0, 0])):
+def transform(points, r: np.ndarray = np.array([X, Y, Z]), t: np.ndarray = np.array([0, 0, 0])):
     """
     Transforms a group of points (3, n).
     The translation can be given as a vector.::
