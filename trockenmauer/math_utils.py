@@ -3,7 +3,7 @@
 # Stefan Hochuli, 01.03.2021, math_utils.py
 # Utility functions, coordinates are treated as columns vectors
 
-from typing import List
+from typing import List, Union, Tuple
 import numpy as np
 
 
@@ -14,7 +14,7 @@ Z = np.array([0, 0, 1])
 
 
 # Homogenous transformation functions: adapted from Jonas Meyer
-def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3):
+def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3) -> np.ndarray:
     """
     Converts a rotation matrix and translation vector as numpy array to a
     homogenous transformation matrix as numpy array.::
@@ -28,7 +28,7 @@ def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3):
 
     :param r: Rotation matrix (3, 3)
     :param t: Translation vector (3, 1) or (3, ) or (1, 3)
-    :param n_dim: Number of dimension (without the added homogenous dimension)
+    :param n_dim: Number of coordinate dimensions (without the added homogenous dimension)
     :return: Homogenous transformation matrix (4, 4)
     """
     if t.shape != (n_dim, 1):
@@ -37,7 +37,7 @@ def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3):
     return np.vstack((np.hstack((r, t)), row))
 
 
-def invert_hom_trans_mat(t: np.ndarray):
+def invert_hom_trans_mat(t: np.ndarray) -> np.ndarray:
     """
     Inverts homogenous transformation matrix
 
@@ -52,11 +52,12 @@ def invert_hom_trans_mat(t: np.ndarray):
     return create_hom_trans_mat(r_inv, t_inv, n_dim)
 
 
-def convert_2_hom_coord(t: np.ndarray, n_dim: int = 3):
+def convert_2_hom_coord(t: np.ndarray, n_dim: int = 3) -> np.ndarray:
     """
     Converts a collection of 3D vectors to homogenous coord vector
 
     :param t: Coordinates (3, n)
+    :param n_dim: Number of coordinate dimensions
     :return: Homogenous coordinates (4, n)
     """
     if t.shape[0] != n_dim:
@@ -67,7 +68,7 @@ def convert_2_hom_coord(t: np.ndarray, n_dim: int = 3):
     return np.concatenate((t, np.ones((1, num))), axis=0)
 
 
-def pca(points: np.ndarray):
+def pca(points: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculates the principal component analysis of vertices (3, n)
     and returns the eigenvalue and eigenvectors (as column vectors).
@@ -82,9 +83,9 @@ def pca(points: np.ndarray):
     return np.sqrt(e_val), e_vec
 
 
-def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
-               x: List = None, y: List = None, z: List = None
-               ) -> np.ndarray:
+def rot_matrix(e_vec: np.ndarray, order: Union[List, np.ndarray] = (0, 1, 2),
+               x: Union[List] = None, y: Union[List] = None,
+               z: Union[List] = None) -> np.ndarray:
     """
     Calculates the rotation matrix from the three eigenvectors
     to the three axis x, y, z.
@@ -121,13 +122,12 @@ def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
 
     if x and y and z:  # Rotation matrix from eigenvectors to a new basis
         # R * e_vec = b -> solve for R with three known points with a*x = b
-        # e_vec = e_vec.T
         zero = np.zeros((3, 3))
         a = np.block([[e_vec_t, zero, zero],
                       [zero, e_vec_t, zero],
                       [zero, zero, e_vec_t]])
         b = np.vstack((x, y, z)).T  # b = basis vectors as column vectors: | x y z |
-        b = np.hstack((b[0], b[1], b[2]))  # b = [xx, yx, zx, xy, yy, zy, zx, zy, zz]
+        b = b.reshape(9, 1)  # b = [xx, yx, zx, xy, yy, zy, zx, zy, zz]
         x = np.linalg.solve(a, b)
         x = np.reshape(x, (3, 3))  # It's correct with transpose...
     else:  # The eigenvectors are the rotation matrix to the respective coordinate system
@@ -138,7 +138,8 @@ def rot_matrix(e_vec: np.ndarray, order: List = (0, 1, 2),
     return x
 
 
-def transform(points, r: np.ndarray = np.array([X, Y, Z]), t: np.ndarray = np.array([0, 0, 0])):
+def transform(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T,
+              t: np.ndarray = np.array([0, 0, 0]), n_dim: int = 3) -> np.ndarray:
     """
     Transforms a group of points (3, n).
     The translation can be given as a vector.::
@@ -148,13 +149,14 @@ def transform(points, r: np.ndarray = np.array([X, Y, Z]), t: np.ndarray = np.ar
     :param points: Points (3, n)
     :param r: Rotation matrix (3, 3)
     :param t: optional translation vector (3, 1) or (3, ) or (1, 3)
+    :param n_dim: Number of coordinate dimensions
     :return: Points (3, n)
     """
-    if points.shape[0] != 3:
+    if points.shape[0] != n_dim:
         raise ValueError
 
-    t = create_hom_trans_mat(r, t)
-    points = convert_2_hom_coord(points)
+    t = create_hom_trans_mat(r, t, n_dim)
+    points = convert_2_hom_coord(points, n_dim)
 
     transformed_points = t @ points
     transformed_points = transformed_points[:3, :]  # remove the (homogenous) dimension
@@ -162,7 +164,8 @@ def transform(points, r: np.ndarray = np.array([X, Y, Z]), t: np.ndarray = np.ar
     return transformed_points
 
 
-def transform2origin(points, r):
+def transform2origin(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T
+                     ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate the center of mass of a given set of vertices (uniform mass distribution).
     The transformation includes a translation of the center of mass to (0, 0, 0).
