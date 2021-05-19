@@ -28,10 +28,21 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (
     scale = random.uniform(scale[0], scale[1])
 
     # Coordinates of one corner (first quadrant, all coordinates positive)
-    x = scale * random.uniform(x - x*edge_noise, x + x*edge_noise) / 2
-    y = scale * random.uniform(y - y*edge_noise, y + y*edge_noise) / 2
-    z = scale * random.uniform(z - z*edge_noise, z + z*edge_noise) / 2
+    x = scale * random.uniform(x / 2 - x*edge_noise, x / 2 + x*edge_noise) / 2
+    y = scale * random.uniform(y / 2 - y*edge_noise, y / 2 + y*edge_noise) / 2
+    z = scale * random.uniform(z / 2 - z*edge_noise, z / 2 + z*edge_noise) / 2
     print(np.round([x*2, y*2, z*2], 2))
+
+    # a = [0, 0, 0]
+    # b = [x, 0, 0]
+    # c = [x, y, 0]
+    # d = [0, y, 0]
+    # e = [0, 0, z]
+    # f = [x, 0, z]
+    # g = [x, y, z]
+    # h = [0, y, z]
+    # v = np.array([a, b, c, d,  # lower 4 vertices
+    #               e, f, g, h])  # upper 4 vertices
 
     v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
                   [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
