@@ -21,6 +21,7 @@ def set_axes_equal(ax):
     x_limits = ax.get_xlim3d()
     y_limits = ax.get_ylim3d()
     z_limits = ax.get_zlim3d()
+    # print(x_limits, y_limits, z_limits)
 
     x_range = abs(x_limits[1] - x_limits[0])
     x_middle = np.mean(x_limits)

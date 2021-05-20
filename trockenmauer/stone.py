@@ -9,10 +9,9 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
-from matplotlib.tri import Triangulation
 
 from .utils import set_axes_equal
-from .math_utils import pca, rot_matrix, transform, transform2origin, X, Y, Z
+from .math_utils import order_clockwise, pca, rot_matrix, transform, transform2origin, X, Y, Z
 from typing import List
 
 
@@ -59,7 +58,7 @@ class Boundary:
         g = [x, y, z]
         h = [0, y, z]
 
-        self.vertices = [a, b, c, d, e, f, g, h]
+        self.vertices = np.array([a, b, c, d, e, f, g, h])
 
         self.bottom = np.array([a, b, c, d])
         self.front = np.array([a, b, f, e])
@@ -83,12 +82,12 @@ class Boundary:
         :return:
         """
 
+        # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
+        ax.plot3D(self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2], 'w.', markersize=1)
         # triangulation
         col = Poly3DCollection(self.triangles, linewidths=1, edgecolors='grey', alpha=.1)
         col.set_facecolor('grey')
         ax.add_collection3d(col)
-        # print(self.bottom)
-        # print(self.bottom.shape, self.bottom.tolist())
 
         # ax.plot3D(self.bottom[:, 0], self.bottom[:, 1], self.bottom[:, 2], 'k-')
         # ax.plot3D(self.front[:, 0], self.front[:, 1], self.front[:, 2], 'k-')
@@ -131,15 +130,20 @@ class Stone:
     # transformed vertices and orientation
     vertices: np.ndarray = None  # (n, 3)
     center: np.ndarray = None
+    triangles_values: List = None
+    triangles_index: List = None
 
-    # sides of the stone and their properties
-    bottom: np.ndarray = None  # bottom vertices of the stone
-    bottom_n: np.ndarray = None  # direction of the bottom normal (downwards
-    top: np.ndarray = None  # top vertices of the stone
-    top_n = np.ndarray = None  # direction of the top normal (upwards)
+    # faces of the stone and their properties
+    bottom: np.ndarray = None  # vertices of the bottom face
+    bottom_center: np.ndarray = None  # center of the bottom face
+    bottom_n: np.ndarray = None  # normal of the bottom face
+    top: np.ndarray = None  # vertices of the top face
+    top_center: np.ndarray = None  # center of the top face
+    top_n: np.ndarray = None  # normal of the top face
+
     height: float
 
-    def __init__(self, vertices: np.ndarray, triangles: List = None, name: str = None):
+    def __init__(self, vertices: np.ndarray, triangles_index: List = None, name: str = None):
         """
 
         :param vertices: (n, 3)
@@ -156,40 +160,90 @@ class Stone:
             raise ValueError('Input must be of shape (n, 3)')
 
         self.eigenvalue_orig, self.eigenvector_orig = self.pca(vertices)
+        # Todo: Rotation is screwed (temporary solution: use positive eigenvectors
+        self.eigenvector_orig = np.abs(self.eigenvector_orig)
         self.order = np.argsort(self.eigenvalue_orig)[::-1]  # decreasing from strongest to weakest
         r = rot_matrix(self.eigenvector_orig, order=self.order)
 
         self.vertices, self.center = self.transform2origin(vertices, r)
 
-        # get the faces an their properties
-        # self.get_faces()
+        if not triangles_index and len(vertices) == 8:  # get the triangles by hand for rectangular stones
 
-        # if not triangles and len(vertices) == 8:  # get the triangles by hand for rectangular stones
-        #     a, b, c, d = self.bottom
-        #     e, f, g, h = self.top
-#
-        #     self.triangles = [
-        #         [a, c, b], [a, d, c],  # bottom
-        #         [e, f, g], [e, g, h],  # top
-        #         [a, b, f], [a, f, e],  # front
-        #         [c, d, h], [c, h, g],  # back
-        #         [d, a, e], [d, e, h],  # left
-        #         [b, c, g], [b, g, f]  # right
-        #     ]
+            # order the vertices clockwise bottom, clockwise top
+            self.order_vertices()
 
-    def get_faces(self):
+            # initialize triangles
+            self.triangles_values = [[] for _ in range(12)]  # 8 vertices -> 12 triangles
+            self.triangles_index = [
+                [0, 2, 1], [0, 3, 2],  # bottom
+                [4, 5, 6], [4, 6, 7],  # top
+                [0, 1, 5], [0, 5, 4],  # front
+                [2, 3, 7], [2, 7, 6],  # back
+                [3, 0, 4], [3, 4, 7],  # left
+                [1, 2, 6], [1, 6, 5],  # right
+            ]
+
+            # get the faces an their properties
+            self.update_faces_triangles()
+
+
+            # for i, t_ind in enumerate(self.triangles_index):
+            #     self.triangles_values[i] = [self.vertices[j] for j in t_ind]
+
+            # self.triangles_values = [  # for plotting, not the index
+            #     [a, c, b], [a, d, c],  # bottom
+            #     [e, f, g], [e, g, h],  # top
+            #     [a, b, f], [a, f, e],  # front
+            #     [c, d, h], [c, h, g],  # back
+            #     [d, a, e], [d, e, h],  # left
+            #     [b, c, g], [b, g, f],  # right
+            # ]
+
+
+    def order_vertices(self):
         """
-        Get important faces and their normal.
+        Order the vertices
+        - bottom
+        - top
+        - clockwise
+
+        :return:
+        """
+
+        # order the points by z-value
+        ind = np.argsort(self.vertices[:, 2])
+
+        # get the 4 lowest and 4 highest points
+        bottom = self.vertices[ind[:4]]
+        top = self.vertices[ind[4:]]
+        a, b, c, d = order_clockwise(bottom)
+        e, f, g, h = order_clockwise(top)
+
+        # update the vertices
+        self.vertices = np.array([a, b, c, d,  # lower 4 vertices
+                                  e, f, g, h])  # upper 4 vertices
+
+    def update_faces_triangles(self):
+        """
+        Get important faces and their normals.
         Simplification: a face is a plane for rectangular stones
 
         :return:
         """
 
         self.bottom = self.vertices[:4]
-        self.bottom_n = np.cross(self.bottom[1] - self.bottom[0], self.bottom[2] - self.bottom[0])
+        self.bottom_center = self.bottom.mean(axis=0)
+        self.bottom_n = np.cross(self.bottom[0] - self.bottom[1], self.bottom[2] - self.bottom[0])
 
         self.top = self.vertices[4:]
+        self.top_center = self.top.mean(axis=0)
         self.top_n = np.cross(self.top[1] - self.top[0], self.top[2] - self.top[0])
+
+        self.height = self.top_center[2] - self.bottom_center[2]
+        # print(self.top_center, self.bottom_center)
+
+        # update triangle values
+        self.triangles_values = [[self.vertices[j] for j in t_ind] for t_ind in self.triangles_index]
 
     @staticmethod
     def pca(vert: np.ndarray):
@@ -218,10 +272,12 @@ class Stone:
         """
         v = transform(self.vertices.T, r, t)
         self.vertices = v.T
-        self.center = self.vertices.mean(axis=1)
+        self.center = self.vertices.mean(axis=0)
+
+        self.update_faces_triangles()
 
     @staticmethod
-    def transform2origin(vert, r):
+    def transform2origin(vert, r=np.array([X, Y, Z])):
         """
         Transforms the stone to the origin and aligns the axis with the rotation matrix.
 
@@ -229,7 +285,7 @@ class Stone:
         :param r: rotation matrix
         :return: Transformed vertices and the (new) center
         """
-
+        # print('transform2origin', vert.shape, vert.mean(axis=0).round(3))
         vert_rot, center = transform2origin(vert.T, r)
         return vert_rot.T, center
 
@@ -240,7 +296,11 @@ class Stone:
             vert = self.vertices
 
         # Plot the points
-        ax.plot3D(vert[:, 0], vert[:, 1], vert[:, 2], 'g.')
+        ax.plot3D(vert[:, 0], vert[:, 1], vert[:, 2], 'g.', markersize=1)
+        # Plot the triangles
+        col = Poly3DCollection(self.triangles_values, linewidths=0.4, edgecolors='green', alpha=.2)
+        col.set_facecolor('green')
+        ax.add_collection3d(col)
 
         set_axes_equal(ax)
         return vert
@@ -253,6 +313,7 @@ class Stone:
 
         # Plot the center
         ax.plot3D(mean[0], mean[1], mean[2], 'r.')
+        ax.text(mean[0], mean[1], mean[2], f'{np.round(mean[0], 1)} {np.round(mean[1], 1)} {np.round(mean[2], 1)}', 'x')
 
         eigenvalues, eigenvectors = self.pca(vert)
 
@@ -271,6 +332,17 @@ class Stone:
             ax.plot3D([cx, cx + v*x], [cy, cy + v*y], [cz, cz + v*z], 'r')
 
             ax.text(cx + v*x, cy + v*y, cz + v*z, np.round(v, 2), 'x')
+
+        # Plot the top and bottom normal
+        # cx, cy, cz = self.bottom_center
+        # ax.plot3D(cx, cy, cz, 'b.')
+        # x, y, z = self.bottom_n
+        # ax.plot3D([cx, cx + 3*x], [cy, cy + 3*y], [cz, cz + 3*z], 'b')
+        # cx, cy, cz = self.top_center
+        # ax.plot3D(cx, cy, cz, 'm.')
+        # x, y, z = self.top_n
+        # ax.plot3D([cx, cx + 3*x], [cy, cy + 3*y], [cz, cz + 3*z], 'm')
+
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')
@@ -289,9 +361,11 @@ class Stone:
         :return:
         """
 
-        # fig = plt.figure()
-        ax = plt.axes(projection='3d')
+        fig = plt.figure()
+        ax = Axes3D(fig)
         self.add_plot_to_ax(ax)
+
+        set_axes_equal(ax)
         plt.show()
 
     def __repr__(self):

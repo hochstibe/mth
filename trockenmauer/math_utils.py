@@ -13,6 +13,34 @@ Y = np.array([0, 1, 0])
 Z = np.array([0, 0, 1])
 
 
+def order_clockwise(points: np.ndarray):
+    """
+    Orders 4 points in a clockwise order (ignoring z-value)
+    :param points:
+    :return:
+    """
+
+    # inspired by https://www.pyimagesearch.com/2016/03/21/ordering-coordinates-clockwise-with-python-and-opencv/
+
+    # sort the points based on their x-coordinates
+    x_sorted = points[np.argsort(points[:, 0]), :]
+    # get the two min- and max-x-coordinate-points
+    x_min_2 = x_sorted[:2, :]
+    x_max_2 = x_sorted[2:, :]
+
+    # sort the min-x coordinates according to their
+    # y-coordinates so we can get the point closest to the origin and the other
+    a, d = x_min_2[np.argsort(x_min_2[:, 1]), :]
+
+    # calculate the euclidean distance from a (closest to origin)
+    # to the 2 points with max-x-coordinates.
+    # The closer point is b, the further c
+    distances = np.linalg.norm(a - x_max_2, axis=1)
+    b, c = x_max_2[np.argsort(distances), :]
+
+    return a, b, c, d
+
+
 # Homogenous transformation functions: adapted from Jonas Meyer
 def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3) -> np.ndarray:
     """
@@ -177,6 +205,16 @@ def transform2origin(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T
     # center of the vertices
     m = np.mean(points, axis=1)
 
-    transform(points, r, m)
+    # transform to origin
+    # t = transform(points, t=-m)
+    # print('transform to origin', t.mean(axis=1))
+    # # rotate
+    # t = transform(points, r)
+    # print('rotatate', t.mean(axis=1))
+    # # transform back
+    # t = transform(points, t=m)
+    # print('transform back', t.mean(axis=1))
 
-    return transform(points, r, -m), np.zeros(3)
+    new = transform(points, r, -m)
+
+    return new, new.mean(axis=1)

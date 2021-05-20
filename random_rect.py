@@ -6,6 +6,7 @@
 
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.plot import plot_stones
+from trockenmauer.utils import set_axes_equal
 
 """
 Generates regular cuboids with a length within ``[0.05, 0.3]``
@@ -14,6 +15,6 @@ This results in a minimal length of 0.05 and a maximal length of 0.6.
 """
 
 # stones = [generate_regular_stone(0.2, 0.1, 0.1, name=str(i)) for i in range(10)]
-stones = [generate_regular_stone(0.2, 0.1, 0.1, edge_noise=0.5, scale=[1, 2]) for i in range(10)]
+stones = [generate_regular_stone(0.3, 0.15, 0.1, edge_noise=0.5, scale=[1, 2]) for i in range(10)]
 
 plot_stones(stones)
