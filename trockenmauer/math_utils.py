@@ -183,6 +183,9 @@ def transform(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T,
     if points.shape[0] != n_dim:
         raise ValueError
 
+    # Todo: Rotation around a given point: T(-t) @ T(r) @ T(t)
+    # --> Rotation is not working properly at the moment?
+
     t = create_hom_trans_mat(r, t, n_dim)
     points = convert_2_hom_coord(points, n_dim)
 

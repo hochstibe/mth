@@ -89,12 +89,6 @@ class Boundary:
         col.set_facecolor('grey')
         ax.add_collection3d(col)
 
-        # ax.plot3D(self.bottom[:, 0], self.bottom[:, 1], self.bottom[:, 2], 'k-')
-        # ax.plot3D(self.front[:, 0], self.front[:, 1], self.front[:, 2], 'k-')
-        # ax.plot3D(self.back[:, 0], self.back[:, 1], self.back[:, 2], 'k-')
-        # ax.plot3D(self.left[:, 0], self.left[:, 1], self.left[:, 2], 'k-')
-        # ax.plot3D(self.right[:, 0], self.right[:, 1], self.right[:, 2], 'k-')
-
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')
@@ -170,58 +164,38 @@ class Stone:
         if not triangles_index and len(vertices) == 8:  # get the triangles by hand for rectangular stones
 
             # order the vertices clockwise bottom, clockwise top
-            self.order_vertices()
+            # order the points by z-value
+            ind = np.argsort(self.vertices[:, 2])
+
+            # get the 4 lowest and 4 highest points
+            bottom = self.vertices[ind[:4]]
+            top = self.vertices[ind[4:]]
+            a, b, c, d = order_clockwise(bottom)
+            e, f, g, h = order_clockwise(top)
+
+            # update the vertices
+            self.vertices = np.array([a, b, c, d,  # lower 4 vertices
+                                      e, f, g, h])  # upper 4 vertices
 
             # initialize triangles
             self.triangles_values = [[] for _ in range(12)]  # 8 vertices -> 12 triangles
             self.triangles_index = [
+                # a c  b    a  d  c]
                 [0, 2, 1], [0, 3, 2],  # bottom
+                # e f  g]   e  g  h]
                 [4, 5, 6], [4, 6, 7],  # top
+                # a b  f    a  f  e
                 [0, 1, 5], [0, 5, 4],  # front
+                # c d  h    c  h  g
                 [2, 3, 7], [2, 7, 6],  # back
+                # d a  e    d  e  h
                 [3, 0, 4], [3, 4, 7],  # left
+                # b c  g    b  g  f
                 [1, 2, 6], [1, 6, 5],  # right
             ]
 
             # get the faces an their properties
             self.update_faces_triangles()
-
-
-            # for i, t_ind in enumerate(self.triangles_index):
-            #     self.triangles_values[i] = [self.vertices[j] for j in t_ind]
-
-            # self.triangles_values = [  # for plotting, not the index
-            #     [a, c, b], [a, d, c],  # bottom
-            #     [e, f, g], [e, g, h],  # top
-            #     [a, b, f], [a, f, e],  # front
-            #     [c, d, h], [c, h, g],  # back
-            #     [d, a, e], [d, e, h],  # left
-            #     [b, c, g], [b, g, f],  # right
-            # ]
-
-
-    def order_vertices(self):
-        """
-        Order the vertices
-        - bottom
-        - top
-        - clockwise
-
-        :return:
-        """
-
-        # order the points by z-value
-        ind = np.argsort(self.vertices[:, 2])
-
-        # get the 4 lowest and 4 highest points
-        bottom = self.vertices[ind[:4]]
-        top = self.vertices[ind[4:]]
-        a, b, c, d = order_clockwise(bottom)
-        e, f, g, h = order_clockwise(top)
-
-        # update the vertices
-        self.vertices = np.array([a, b, c, d,  # lower 4 vertices
-                                  e, f, g, h])  # upper 4 vertices
 
     def update_faces_triangles(self):
         """
