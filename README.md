@@ -29,3 +29,32 @@ Scripts\pip.exe list
 # Create virtual environment
 python -m venv venv
 ```
+
+### Virtualbox
+
+- Ubuntu installieren (20.04 funktionierte)
+- Guest additions installieren
+  - ``sudo apt install build-essential dkms linux-headers-$(uname -r)``
+  - -> Geräte -> Gast erweiterungen anlegen
+- ``sudo apt install git``
+- ``sudo apt install pip-python3``  oderso ähnlich...
+- ``sudo apt-get install python3-venv`` 
+- Check python interpreter location: ``python3; import sys; sys.executable``  
+- Pymesh: https://github.com/PyMesh/PyMesh
+  - ``git clone https://github.com/PyMesh/PyMesh.git``
+  - ``cd PyMesh``
+  - ``git submodule update --init``
+  - ``export PYMESH_PATH=$(pwd)``
+  - ``sudo apt-get install libeigen3-dev libgmp-dev libgmpxx4ldbl libmpfr-dev libboost-dev libboost-thread-dev libtbb-dev python3-dev cmake``
+  - ``python3 build.py all`` ($Pymesh)  
+  - ``mkdir build`` ($PyMesh)
+  - ``cd build``
+  - ``cmake ..``
+  - ``make`` 
+  - ``make tests``
+- MTh Github repo
+  - ``cd /home/stefan``
+  - ``git clone https://github.com/hochstibe/mth.git``
+  -  ``python3 -m venv venv``
+- Yade
+  - ``sudo apt install yade``
