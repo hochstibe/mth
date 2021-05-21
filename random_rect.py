@@ -6,7 +6,6 @@
 
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.plot import plot_stones
-from trockenmauer.utils import set_axes_equal
 
 """
 Generates regular cuboids with a length within ``[0.05, 0.3]``
