@@ -39,6 +39,7 @@ python -m venv venv
 - ``sudo apt install git``
 - ``sudo apt install pip-python3``  oderso ähnlich...
 - ``sudo apt-get install python3-venv`` 
+- ``sudo apt-get install python3-tk`` -> tinker backend für matplotlib
 - Check python interpreter location: ``python3; import sys; sys.executable``  
 - Pymesh: https://github.com/PyMesh/PyMesh
   - ``git clone https://github.com/PyMesh/PyMesh.git``
@@ -52,9 +53,14 @@ python -m venv venv
   - ``cmake ..``
   - ``make`` 
   - ``make tests``
+  - ``cd PyMesh``
+  - ``sudo python3 setup.py install`` -> Achtung, in welchen Interpreter es installiert wird...
 - MTh Github repo
   - ``cd /home/stefan``
   - ``git clone https://github.com/hochstibe/mth.git``
   -  ``python3 -m venv venv``
+  - ``source venv/bin/activate``
+  - ``sudo /home/stefan/mth/venv/bin/python setup.py install``
+  - ``venv/bin/pip install -r requirements.txt``
 - Yade
   - ``sudo apt install yade``
