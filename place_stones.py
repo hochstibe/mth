@@ -6,6 +6,7 @@
 from trockenmauer.stone import Stone, Boundary, Wall
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.utils import set_axes_equal
+from trockenmauer.math_utils import Translation
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -32,7 +33,7 @@ def find_placement(wall: Wall):
                 # print('on top of a stone', z, z_temp)
                 z = z_temp
 
-    return x, y, z
+    return np.array([x, y, z])
 
 
 def validate_placement(stone: Stone, wall: Wall):
@@ -58,9 +59,9 @@ boundary.add_plot_to_ax(ax)
 # place stones
 for i in range(20):
     stone = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
-    x, y, z = find_placement(wall)
-
-    stone.transform(t=np.array([x, y, z] - stone.bottom_center))
+    xyz = find_placement(wall)
+    t = Translation(translation=xyz - stone.bottom_center)
+    stone.transform(transformation=t)
 
     # add the stone to the wall
     wall.stones.append(stone)

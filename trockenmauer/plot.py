@@ -32,7 +32,7 @@ def plot_stones(stones: List[Stone]):
     for i, s in enumerate(stones):
         ax = fig.add_subplot(nrows, ncols, i+1, projection='3d')
         # axs[i // 3, i % 3] = s.plot()
-        s.add_plot_to_ax(ax)
+        s.add_plot_to_ax(ax, positive_eigenvec=False)
         ax.set_title(s.name)
 
     plt.show()

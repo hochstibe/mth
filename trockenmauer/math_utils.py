@@ -7,10 +7,153 @@ from typing import List, Union, Tuple
 import numpy as np
 
 
-# unit vectors
-X = np.array([1, 0, 0])
-Y = np.array([0, 1, 0])
-Z = np.array([0, 0, 1])
+class Transformation:
+    """
+    Base class for a transformation with
+
+     * Number of dimensions
+     * homogenous transformation matrix
+     * function for applying the transformation on a set of points
+
+    """
+
+    hom_transf_matrix: np.ndarray = None
+
+    def __init__(self, n_dim: int = 3):
+        """
+
+        :param n_dim: Number of dimensions
+        """
+        self.n_dim = n_dim
+
+    def build_hom_transf_matrix(self):
+        """
+        Dummy function to build the homogenous transformation matrix
+
+        :return:
+        """
+
+        """Dummy function, replaced in child classes"""
+        self.hom_transf_matrix = create_hom_trans_mat(n_dim=self.n_dim)
+
+    def transform(self, points: np.ndarray):
+        """
+        Dummy function to apply the transformation on a set of points. Replaced in child classes
+
+        :param points: Coordinate tuples (3, n)
+        :return: Transformed points (3, n)
+        """
+        hom_points = convert_2_hom_coord(points, self.n_dim)
+        return transform(hom_points, self.hom_transf_matrix, self.n_dim, homogenous=True)
+
+
+class Translation(Transformation):
+    """
+    Translation
+    """
+    def __init__(self, translation: np.ndarray = np.zeros(3), n_dim=3):
+        """
+
+        :param translation: Translation, 1D-array
+        :param n_dim: Number of dimensions
+        """
+        super().__init__(n_dim)
+        self.translation = translation
+
+        self.build_hom_transf_matrix()
+
+    def build_hom_transf_matrix(self):
+        """
+        Build the homogenous transformation matrix for the translation
+
+        :return: Store the matrix as an attribute
+        """
+        self.hom_transf_matrix = create_hom_trans_mat(t=self.translation, n_dim=self.n_dim)
+
+
+class Rotation(Transformation):
+    """Rotation around a given point"""
+
+    def __init__(self, rotation=np.eye(3), center=np.zeros(3), n_dim=3):
+        """
+
+        :param rotation: Rotation-matrix
+        :param center: Center of the orientation
+        :param n_dim: Number of dimensions
+        """
+        super().__init__(n_dim)
+        self.rotation = rotation
+        self.center = center
+
+        self.build_hom_transf_matrix()
+
+    def build_hom_transf_matrix(self):
+        """
+        Build the homogenous transformation matrix for the rotation
+        (translation to the center, rotation, translate back).
+
+        :return: Store the matrix as an attribute
+        """
+        # translate center to [0, 0, 0]
+        translation1 = create_hom_trans_mat(t=-self.center, n_dim=self.n_dim)
+        # rotate around the center
+        rotation = create_hom_trans_mat(r=self.rotation, n_dim=self.n_dim)
+        # translate back
+        translation2 = create_hom_trans_mat(t=self.center, n_dim=self.n_dim)
+
+        self.hom_transf_matrix = translation2 @ rotation @ translation1
+
+
+class RotationTranslation(Transformation):
+    """
+    Rotation around a given points followed by a translation
+    """
+
+    def __init__(self, rotation: np.ndarray = np.eye(3), center: np.ndarray = np.zeros(3),
+                 translation: np.ndarray = np.zeros(3), n_dim=3):
+        """
+
+        :param rotation: Rotation-matrix
+        :param center: Center of the orientation
+        :param translation: Translation, 1D-array
+        :param n_dim: Number of dimensions
+        """
+        super().__init__(n_dim)
+        # Rotation
+        self.rotation = Rotation(rotation=rotation, center=center, n_dim=self.n_dim)
+        self.translation = Translation(translation=translation, n_dim=self.n_dim)
+
+        self.build_hom_transf_matrix()
+
+    def build_hom_transf_matrix(self):
+        """
+        Build the homogenous transformation matrix for the rotation and the following translation
+        (translation to the center, rotation, translate back, translation).
+        :return:
+        """
+        self.hom_transf_matrix = self.translation.hom_transf_matrix @ self.rotation.hom_transf_matrix
+
+
+def transform(points, transf_matrix: np.eye(4), n_dim=3, homogenous=True, **kwargs) -> np.ndarray:
+    """
+    Transforms a group of points (3, n).
+
+    :param points: Points (3, n)
+    :param transf_matrix: (homogenous) transformation matrix (4, 4)
+    :param n_dim: Number of dimensions
+    :param homogenous: Boolean, if the transformation matrix and points are already homogenous
+    :param kwargs: kwargs, if the transformation matrix and points are not homogenous
+    :return: Points (3, n) (normal coordinates)
+    """
+
+    if not homogenous:
+        points = convert_2_hom_coord(points, n_dim)
+        transf_matrix = create_hom_trans_mat(kwargs['r'], kwargs['t'])
+
+    # Apply the transformation
+    transformed_points = transf_matrix @ points
+
+    return transformed_points[:n_dim, :]  # remove the (homogenous) dimension
 
 
 def order_clockwise(points: np.ndarray):
@@ -42,7 +185,8 @@ def order_clockwise(points: np.ndarray):
 
 
 # Homogenous transformation functions: adapted from Jonas Meyer
-def create_hom_trans_mat(r: np.ndarray, t: np.ndarray, n_dim: int = 3) -> np.ndarray:
+def create_hom_trans_mat(r: np.ndarray = np.eye(3), t: np.ndarray = np.zeros(3),
+                         n_dim: int = 3) -> np.ndarray:
     """
     Converts a rotation matrix and translation vector as numpy array to a
     homogenous transformation matrix as numpy array.::
@@ -164,60 +308,3 @@ def rot_matrix(e_vec: np.ndarray, order: Union[List, np.ndarray] = (0, 1, 2),
         # x_old = A * x_new -> x_new = A^-1 * x_old --> e_vec.T == e_vec^-1
         x = e_vec_t
     return x
-
-
-def transform(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T,
-              t: np.ndarray = np.array([0, 0, 0]), n_dim: int = 3) -> np.ndarray:
-    """
-    Transforms a group of points (3, n).
-    The translation can be given as a vector.::
-
-       R * (v+t) = v' with R = (3, 3), v = (3, n), t=(3, 1), v' = (3, n)
-
-    :param points: Points (3, n)
-    :param r: Rotation matrix (3, 3)
-    :param t: optional translation vector (3, 1) or (3, ) or (1, 3)
-    :param n_dim: Number of coordinate dimensions
-    :return: Points (3, n)
-    """
-    if points.shape[0] != n_dim:
-        raise ValueError
-
-    # Todo: Rotation around a given point: T(-t) @ T(r) @ T(t)
-    # --> Rotation is not working properly at the moment?
-
-    t = create_hom_trans_mat(r, t, n_dim)
-    points = convert_2_hom_coord(points, n_dim)
-
-    transformed_points = t @ points
-    transformed_points = transformed_points[:3, :]  # remove the (homogenous) dimension
-
-    return transformed_points
-
-
-def transform2origin(points: np.ndarray, r: np.ndarray = np.array([X, Y, Z]).T
-                     ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Calculate the center of mass of a given set of vertices (uniform mass distribution).
-    The transformation includes a translation of the center of mass to (0, 0, 0).
-
-    :param points: collection of 3D points (3, n)
-    :param r: rotation matrix
-    :return: Transformed vertices and the (new) center
-    """
-    # center of the vertices
-    m = np.mean(points, axis=1)
-
-    # transform to origin
-    # t = transform(points, t=-m)
-    # print('transform to origin', t.mean(axis=1))
-    # # rotate
-    # t = transform(points, r)
-    # print('rotatate', t.mean(axis=1))
-    # # transform back
-    # t = transform(points, t=m)
-    # print('transform back', t.mean(axis=1))
-
-    new = transform(points, r, -m)
-
-    return new, new.mean(axis=1)
