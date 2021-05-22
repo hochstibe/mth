@@ -3,36 +3,41 @@
 # Stefan Hochuli, 26.02.2021, plot.py
 #
 
-from typing import List
+from typing import TYPE_CHECKING
 
-import matplotlib.pyplot as plt
+import numpy as np
 
-from .stone import Stone
-
-plt.rcParams.update({'axes.titlesize': 'small'})
-plt.rcParams.update({'axes.labelsize': 'small'})
-plt.rcParams.update({'xtick.labelsize': 'small'})
-plt.rcParams.update({'ytick.labelsize': 'small'})
+if TYPE_CHECKING:
+    from matplotlib.pyplot import Axes
 
 
-def plot_stones(stones: List[Stone]):
+def set_axes_equal(ax: 'Axes'):
     """
-    Plot all stones in separate subplots
+    Make axes of 3D plot have equal scale so that spheres appear as spheres,
+    cubes as cubes, etc..  This is one possible solution to Matplotlib's
+    ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
 
-    :param stones: List of stones
-    :return: plot window
+    Credits: https://stackoverflow.com/a/31364297
+
+    :param ax: a matplotlib axis
+    :return: None
     """
-    # Caluculate the number of rows / columns of the subplots
-    nrows = len(stones) // 4 + 1
-    ncols = 4
 
-    fig = plt.figure(figsize=(ncols*3.1, nrows*3))
-    fig.suptitle('Collection of stones and their eigenvectors')
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
 
-    for i, s in enumerate(stones):
-        ax = fig.add_subplot(nrows, ncols, i+1, projection='3d')
-        # axs[i // 3, i % 3] = s.plot()
-        s.add_plot_to_ax(ax, positive_eigenvec=False)
-        ax.set_title(s.name)
+    x_range = abs(x_limits[1] - x_limits[0])
+    x_middle = np.mean(x_limits)
+    y_range = abs(y_limits[1] - y_limits[0])
+    y_middle = np.mean(y_limits)
+    z_range = abs(z_limits[1] - z_limits[0])
+    z_middle = np.mean(z_limits)
 
-    plt.show()
+    # The plot bounding box is a sphere in the sense of the infinity
+    # norm, hence I call half the max range the plot radius.
+    plot_radius = 0.5*max([x_range, y_range, z_range])
+
+    ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+    ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])

@@ -8,7 +8,7 @@ from typing import List
 
 import numpy as np
 
-from trockenmauer.stone import Stone
+from .stone import Stone
 
 
 def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (1, 1),

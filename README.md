@@ -54,13 +54,15 @@ python -m venv venv
   - ``make`` 
   - ``make tests``
   - ``cd PyMesh``
-  - ``sudo python3 setup.py install`` -> Achtung, in welchen Interpreter es installiert wird...
+  - Installieren des PyMesh packages:
+    - Basis interpreter ``sudo python3 setup.py install``
+    - Venv ``sudo /home/stefan/mth/venv/bin/python setup.py install``
 - MTh Github repo
   - ``cd /home/stefan``
   - ``git clone https://github.com/hochstibe/mth.git``
   -  ``python3 -m venv venv``
   - ``source venv/bin/activate``
-  - ``sudo /home/stefan/mth/venv/bin/python setup.py install``
   - ``venv/bin/pip install -r requirements.txt``
+  - ``sudo venv/bin/pip install -e .``
 - Yade
   - ``sudo apt install yade``
