@@ -20,11 +20,11 @@ ax = Axes3D(fig, auto_add_to_figure=False)
 fig.add_axes(ax)
 boundary.add_shape_to_ax(ax)
 
-validator = Validator(intersection_boundary=True)
+validator = Validator(intersection_boundary=True, intersection_stones=True)
 
 # place stones
 
-for i in range(20):
+for i in range(30):
     stone = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2], name=str(i))
     # Find a placement
     xyz = find_placement(wall)
@@ -36,14 +36,17 @@ for i in range(20):
 
     if passed:
         # add the stone to the wall and to the plot
-        wall.stones.append(stone)
+        wall.add_stone(stone)
         stone.add_shape_to_ax(ax)
     else:
         if errors.intersection_boundary:
             # Add the intersection to the plot
             errors.intersection_boundary.add_shape_to_ax(ax, color='red')
+        if errors.intersection_stones:
+            # Add the intersection to the plot
+            errors.intersection_stones.add_shape_to_ax(ax, color='orange')
 
-    stone.add_shape_to_ax(ax)
+print(f'Successfully placed {len(wall.stones)} stones.')
 
 set_axes_equal(ax)
 ax.set_xlabel('x')

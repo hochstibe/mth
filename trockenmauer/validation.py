@@ -32,12 +32,15 @@ class Validator:
     - ...
     """
 
-    def __init__(self, intersection_boundary=False):
+    def __init__(self, intersection_boundary=False, intersection_stones=False):
         """
-        The parameters control, whitch validations will be executed
-        :param intersection_boundary:
+        The parameters control, witch validations will be executed
+
+        :param intersection_boundary: validate intersections with the boundary
+        :param intersection_stones: validate intersections with the previously placed stones
         """
         self.intersection_boundary = intersection_boundary
+        self.intersection_stones = intersection_stones
 
     @staticmethod
     def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> 'pymesh.Mesh':
@@ -57,7 +60,27 @@ class Validator:
         """
         intersection = self._mesh_intersection(stone.mesh, boundary.mesh_solid)
         if np.any(intersection.vertices):
-            intersection = load_from_pymesh('geometry', intersection, 'intersection')
+            intersection = load_from_pymesh('geometry', intersection, 'boundary intersection')
+            return True, intersection
+        else:
+            return False, None
+
+    def _intersection_stones(self, stone: 'Stone', wall: 'Wall'
+                             ) -> Tuple[bool, Union[None, 'Geometry']]:
+        """
+        Intersects a stone with the previously placed stones
+
+        :param stone: Stone object
+        :param wall: Wall object with the mesh of all previouly placed stones
+        :return:
+        """
+        if not wall.mesh:
+            # No stone was placed yet
+            return False, None
+
+        intersection = self._mesh_intersection(stone.mesh, wall.mesh)
+        if np.any(intersection.vertices):
+            intersection = load_from_pymesh('geometry', intersection, 'stone intersection')
             return True, intersection
         else:
             return False, None
@@ -88,9 +111,16 @@ class Validator:
                 passed = False
                 errors.intersection_boundary = details
 
+        if self.intersection_stones:
+            intersects, details = self._intersection_stones(stone, wall)
+            if intersects:
+                passed = False
+                errors.intersection_stones = details
+
         return passed, errors
 
 
 @dataclass
 class ValidationError:
     intersection_boundary: 'Geometry' = False
+    intersection_stones: 'Geometry' = False
