@@ -11,6 +11,7 @@ import pymesh
 
 from .utils import load_from_pymesh
 from .stone import Intersection
+from .math_utils import Translation
 
 if TYPE_CHECKING:
     from .stone import Geometry, Stone, Boundary, Wall
@@ -47,6 +48,11 @@ class Validator:
         self.intersection_stones = intersection_stones
         self.distance2boundary = distance2boundary
 
+        # initialize tetgen for tetrahedralization
+        self.tetgen = pymesh.tetgen()
+        self.tetgen.max_tet_volume = 2
+        self.tetgen.verbosity = 0  # no output
+
     @staticmethod
     def _bb_intersections(tree: 'AABBTree', bb: 'AABB') -> List['Intersection']:
         # for i, box in zip(tree.overlap_values(bb), tree.overlap_aabbs(bb)):
@@ -59,15 +65,19 @@ class Validator:
         # wall instead of tree would be needed
 
     @staticmethod
-    def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> 'pymesh.Mesh':
+    def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> Union[None, 'pymesh.Mesh']:
         # engine: igl (auto) fails on empty intersection, cgal requires closed meshes
         # cork always works, but is more experimental
-        intersection = pymesh.boolean(mesh1, mesh2, "intersection", engine='cgal')
+        try:
+            intersection = pymesh.boolean(mesh1, mesh2, "intersection", engine='cgal')
+        except RuntimeError as err:
+            print(err)
+            intersection = None
 
         return intersection
 
     def _intersection_boundary(self, stone: 'Stone', wall: 'Wall'
-                               ) -> Tuple[bool, Union[None, 'Geometry']]:
+                               ) -> Tuple[bool, Union[None, 'Intersection']]:
         """
         Intersects a stone with the boundary.
 
@@ -76,8 +86,15 @@ class Validator:
         :return: Status: True (there is an intersection) / False (no intersection; intersection mesh
         """
         intersection = self._mesh_intersection(stone.mesh, wall.boundary.mesh_solid)
-        if np.any(intersection.vertices):
-            intersection = load_from_pymesh('geometry', intersection, 'boundary intersection')
+        if intersection and np.any(intersection.vertices):
+            self.tetgen.points = intersection.vertices
+            self.tetgen.triangles = intersection.faces
+            self.tetgen.run()
+            intersection = self.tetgen.mesh
+            print(len(intersection.voxels))
+            intersection = Intersection(mesh=intersection)
+            # intersection = pymesh.tetrahedralize(intersection, 20, engine='tetgen')
+            # intersection = load_from_pymesh('intersection', intersection, 'boundary intersection')
             return True, intersection
         else:
             return False, None
@@ -155,9 +172,61 @@ class Validator:
 
         return passed, results
 
+    def fitness(self, n_dim: int, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall'):
+        """
+        Calculates the fitness of a placement for a stone.
+
+        :param n_dim: Number of dimensions: 3 for x, y, z
+        :param firefly: Firefly with the three coordinates as genes
+        :param stone:
+        :param wall:
+        :return:
+        """
+        # move the bottom center of the stone to the given position
+        t = Translation(translation=firefly - stone.bottom_center)
+        stone.transform(transformation=t)
+        passed, res = self.validate(stone, wall)
+        return res.intersection_volume + res.distance2boundary
+
 
 @dataclass
 class ValidationResult:
-    intersection_boundary: 'Geometry' = False
-    intersection_stones: List['Intersection'] = False
+    """
+    Storing all validation results. The total intersection volume gets automatically updated,
+    if a boundary intersection or stones intersection is set.
+    """
+    _intersection_boundary: 'Intersection' = False
+    _intersection_stones: List['Intersection'] = False
+    intersection_volume: float = 0
     distance2boundary: float = None
+
+    @property
+    def intersection_boundary(self) -> 'Intersection':
+        return self._intersection_boundary
+
+    @property
+    def intersection_stones(self) -> List['Intersection']:
+        return self._intersection_stones
+
+    @intersection_boundary.setter
+    def intersection_boundary(self, new_intersection: 'Intersection'):
+        # print('set boundary volume')
+        self._intersection_boundary = new_intersection
+        self.update_total_volume(new_intersection)
+
+    @intersection_stones.setter
+    def intersection_stones(self, new_intersections: List['Intersection']):
+        # print('set intersection volume: old vol', self.intersection_volume)
+        self._intersection_stones = new_intersections
+        for i in new_intersections:
+            self.update_total_volume(i)
+
+    def update_total_volume(self, new_intersection: 'Intersection'):
+        if new_intersection.mesh_volume:
+            self.intersection_volume += new_intersection.mesh_volume
+            # print('mesh volume updated')
+        elif new_intersection.aabb_volume:
+            self.intersection_volume += new_intersection.aabb_volume
+            # print('aabb volume updated')
+        else:
+            print('intersection but no volume added')

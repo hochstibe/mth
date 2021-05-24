@@ -327,9 +327,7 @@ def tetra_volume(vertices, voxels):
 
     # for v in voxels:
     #     print(np.abs(np.linalg.det(np.vstack((vertices.T[v].T, np.ones(4))))))
-    vol_abs = sum([np.abs(np.linalg.det(np.vstack((vertices.T[v].T, np.ones(4))))) for v in voxels]) / 6
+    # vol_abs = sum([np.abs(np.linalg.det(np.vstack((vertices.T[v].T, np.ones(4))))) for v in voxels]) / 6
     # the tetras after generating with tetgen result in negative volumes --> change the order with [::-1]
     vol_sig = np.sum([np.linalg.det(np.vstack((vertices.T[v].T[::-1], np.ones(4)))) for v in voxels]) / 6
-
-    print('signed volume', vol_sig, 'abs volume', vol_abs, len([np.linalg.det(np.vstack((vertices.T[v].T[::-1], np.ones(4)))) for v in voxels]), 'vox volumes')
     return vol_sig

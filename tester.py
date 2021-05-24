@@ -46,8 +46,17 @@ merged = load_from_pymesh('geometry', merged)
 if not np.any(intersection.vertices):
     print('empty intersection')
 
+# initialize tetgen
+tetgen = pymesh.tetgen()
+tetgen.max_tet_volume = 2
+tetgen.verbosity = 0
+
 print(s1.mesh.num_vertices, s1.mesh.num_faces, s1.mesh.num_voxels)
-tetra = pymesh.tetrahedralize(s1.mesh, 20, engine='tetgen')
+# tetra = pymesh.tetrahedralize(s1.mesh, 20, engine='tetgen')
+tetgen.points = s1.mesh.vertices
+tetgen.triangles = s1.mesh.faces
+tetgen.run()
+tetra = tetgen.mesh
 print(tetra.num_vertices, tetra.num_faces, tetra.num_voxels)
 # print(tetra.voxels)
 # print(tetra.attribute_names, tetra.get_attribute('voxel_volume'))
@@ -60,6 +69,14 @@ print('distances', distances)
 print('faces', faces)
 print('points', points)
 
+# run another tetgen
+tetgen.points = s2.mesh.vertices
+tetgen.triangles = s2.mesh.faces
+tetgen.run()
+tetra2 = tetgen.mesh
+print(tetra2.num_vertices, tetra2.num_faces, tetra2.num_voxels)
+tetra2 = load_from_pymesh('geometry', tetra2, 'tetra')
+
 
 # print('Closed meshes', mesh1.is_closed(), mesh2.is_closed(), intersection.is_closed(), mesh3.is_closed())
 
@@ -70,7 +87,8 @@ fig.add_axes(ax)
 # s2.add_shape_to_ax(ax)
 # s3.add_shape_to_ax(ax, color='red')
 # merged.add_shape_to_ax(ax, color='orange')
-tetra.add_shape_to_ax(ax, color='cyan')
+# tetra.add_shape_to_ax(ax, color='cyan')
+tetra2.add_shape_to_ax(ax, color='brown')
 
 set_axes_equal(ax)
 plt.show()

@@ -4,7 +4,20 @@ import math
 
 class FireflyAlgorithm():
 
-    def __init__(self, D, NP, nFES, alpha, betamin, gamma, LB, UB, function):
+    def __init__(self, D, NP, nFES, alpha, betamin, gamma, LB, UB, function, **kwargs):
+        """
+
+        :param D: dimension of the problem
+        :param NP: population size
+        :param nFES: number of function evaluations
+        :param alpha: alpha parameter
+        :param betamin: beta parameter
+        :param gamma: gamma parameter
+        :param LB: lower bound
+        :param UB: upper bound
+        :param function: evaluation function
+        :param kwargs: additional arguments for the evaluati function
+        """
         self.D = D  # dimension of the problem
         self.NP = NP  # population size
         self.nFES = nFES  # number of function evaluations
@@ -25,6 +38,7 @@ class FireflyAlgorithm():
         self.fbest = None  # the best
         self.evaluations = 0
         self.Fun = function
+        self.kwargs = kwargs
 
     def init_ffa(self):
         for i in range(self.NP):
@@ -90,7 +104,7 @@ class FireflyAlgorithm():
 
             # evaluate new solutions
             for i in range(self.NP):
-                self.Fitness[i] = self.Fun(self.D, self.Fireflies[i])
+                self.Fitness[i] = self.Fun(self.D, self.Fireflies[i], **self.kwargs)
                 self.evaluations = self.evaluations + 1
                 self.I[i] = self.Fitness[i]
 
@@ -103,4 +117,4 @@ class FireflyAlgorithm():
             # move all fireflies to the better locations
             self.move_ffa()
         
-        return self.fbest
+        return self.fbest, self.Fireflies[self.Index[0]]
