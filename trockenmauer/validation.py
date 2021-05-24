@@ -13,7 +13,7 @@ from .utils import load_from_pymesh
 from .stone import Intersection
 
 if TYPE_CHECKING:
-    from .stone import Geometry, Stone, Wall
+    from .stone import Geometry, Stone, Boundary, Wall
     from aabbtree import AABB, AABBTree
 
 
@@ -22,8 +22,9 @@ class Validator:
     Validation functions for a placement
 
     validate
-    - stone is within the boundary -> intersection
-    - stone does not intersect with another -> intersection
+    - stone is within the boundary -> minimize intersection volume
+    - stone does not intersect with another -> minimize intersection volume
+    - distance to the boundary -> minimize distance
     - normal of the ground area at the placement is in the same direction as the stones bottom side -> rotation
     - ...
 
@@ -34,7 +35,8 @@ class Validator:
     - ...
     """
 
-    def __init__(self, intersection_boundary=False, intersection_stones=False):
+    def __init__(self, intersection_boundary=False, intersection_stones=False,
+                 distance2boundary=False):
         """
         The parameters control, witch validations will be executed
 
@@ -43,6 +45,7 @@ class Validator:
         """
         self.intersection_boundary = intersection_boundary
         self.intersection_stones = intersection_stones
+        self.distance2boundary = distance2boundary
 
     @staticmethod
     def _bb_intersections(tree: 'AABBTree', bb: 'AABB') -> List['Intersection']:
@@ -110,13 +113,17 @@ class Validator:
         # else:
         #     return False, None
 
-    def _validate_normals(self, stone: 'Stone', wall: 'Wall'):
-        """
-        The normal of the stone should point in the same direction as the normal of the wall on the given placement
-        """
-        pass
+    @staticmethod
+    def _distance2mesh(points: List[np.ndarray], mesh: 'pymesh.Mesh') -> List:
+        # for each point: [squared distance, closest face, closest point]
+        distances, faces, closest_points = pymesh.distance_to_mesh(mesh, points, engine='cgal')
+        return distances
 
-    def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationError']:
+    def _min_distance2boundary(self, stone: 'Stone', boundary: 'Boundary'):
+        distances = self._distance2mesh(stone.sides_center, boundary.mesh_solid_sides)
+        return np.sqrt(np.min(distances))
+
+    def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
         Validates the new stone to the built wall. All validation functions are used according to the
         attributes set in the validator initialisation.
@@ -125,27 +132,32 @@ class Validator:
 
         :param stone:
         :param wall:
-        :return: passed, errors
+        :return: passed, results
         """
         passed = True
-        errors = ValidationError()
+        results = ValidationResult()
 
         if self.intersection_boundary:
             intersects, details = self._intersection_boundary(stone, wall)
             if intersects:
                 passed = False
-                errors.intersection_boundary = details
+                results.intersection_boundary = details
 
         if self.intersection_stones:
             intersects, details = self._intersection_stones(stone, wall)
             if intersects:
                 passed = False
-                errors.intersection_stones = details
+                results.intersection_stones = details
 
-        return passed, errors
+        if self.distance2boundary:
+            d = self._min_distance2boundary(stone, wall.boundary)
+            results.distance2boundary = d
+
+        return passed, results
 
 
 @dataclass
-class ValidationError:
+class ValidationResult:
     intersection_boundary: 'Geometry' = False
     intersection_stones: List['Intersection'] = False
+    distance2boundary: float = None

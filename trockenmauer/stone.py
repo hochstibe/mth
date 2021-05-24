@@ -157,15 +157,36 @@ class Boundary(Geometry):
 
         # the mesh is only with the bounding planes (bottom and sides) for plotting
         self.mesh = pymesh.form_mesh(vertices[:8], triangles_index[:10])
+        self.calc_triangle_values()
+        # self.mesh = pymesh.form_mesh(vertices, triangles_index)
         # the solid mesh can be used for boolean operations (intersection)
         self.mesh_solid = pymesh.form_mesh(vertices, triangles_index)
-        self.calc_triangle_values()
 
-        self.bottom = np.array([a, b, c, d])
-        self.front = np.array([a, b, f, e])
-        self.back = np.array([d, c, g, h])
-        self.left = np.array([a, e, h, d])
-        self.right = np.array([b, f, g, c])
+        # self.bottom = np.array([a, b, c, d])
+        # solid mesh without the bottom plane for calculating the distance to the sides
+        triangles_index = np.array([
+            [0, 5, 1], [0, 4, 5],  # front
+            [2, 7, 3], [2, 6, 7],  # back
+            [3, 4, 0], [3, 7, 4],  # left
+            [1, 6, 2], [1, 5, 6],  # right
+            # outer for creating a solid
+            [0, 1, 8], [0, 1, 9], [1, 2, 9], [1, 2, 10],  # bottom
+            [2, 3, 10], [2, 3, 11], [3, 0, 11], [3, 0, 8],  # bottom
+            [8, 9, 13], [8, 13, 12],  # front
+            [10, 11, 15], [10, 15, 14],  # back
+            [11, 8, 12], [11, 12, 15],  # left
+            [9, 10, 14], [9, 14, 13],  # right
+            [12, 13, 5], [12, 5, 4], [13, 14, 6], [13, 6, 5],  # top
+            [14, 15, 7], [14, 7, 6], [15, 12, 4], [15, 4, 7],  # top
+        ])
+        self.mesh_solid_sides = pymesh.form_mesh(vertices, triangles_index)
+        # self.mesh = self.mesh_solid_sides
+        # self.calc_triangle_values()
+
+        # self.front_mesh = pymesh.form_mesh(np.array([a, b, f, e]), np.array([[0, 5, 1], [0, 4, 5]]))
+        # self.back_mesh = pymesh.form_mesh(np.array([d, c, g, h]), np.array([[2, 7, 3], [2, 6, 7]]))
+        # self.left = np.array([a, e, h, d])
+        # self.right = np.array([b, f, g, c])
 
     def add_shape_to_ax(self, ax, color='grey'):
         """
@@ -186,6 +207,11 @@ class Boundary(Geometry):
         # col = Poly3DCollection(self.triangles_values, linewidths=1, edgecolors=color, alpha=.1)
         # col.set_facecolor(color)
         # ax.add_collection3d(col)
+        # # Add the triangle normal to the plot
+        # for tri in self.triangles_values:
+        #     n = np.cross(tri[1]-tri[0], tri[2]-tri[0])
+        #     c = np.mean(tri, axis=0)
+        #     ax.plot3D([c[0], c[0]+n[0]], [c[1], c[1]+n[1]], [c[2], c[2]+n[2]], 'b')
 
     def __repr__(self):
         return f'<Boundary(vertices=array([{(self.mesh.vertices[:2])}, ...])>'
@@ -209,14 +235,17 @@ class Stone(Geometry):
     center: np.ndarray = None
 
     # faces of the stone and their properties
-    bottom_index: np.ndarray = None  # vertices of the bottom face
+    bottom: np.ndarray = None  # vertices of the bottom face
     bottom_center: np.ndarray = None  # center of the bottom face
     bottom_n: np.ndarray = None  # normal of the bottom face
-    top_index: np.ndarray = None  # vertices of the top face
+    top: np.ndarray = None  # vertices of the top face
     top_center: np.ndarray = None  # center of the top face
     top_n: np.ndarray = None  # normal of the top face
+    height: float  # not used yet
 
-    height: float
+    sides: List[np.ndarray] = None  # list of the sides of the stone (indices to the mesh)
+    sides_center: List[np.ndarray] = None  # center point (mean) of each side
+    # sides_n: List[np.ndarray] = None
 
     def __init__(self, vertices: np.ndarray,
                  triangles_index: np.ndarray = None, name: str = None):
@@ -269,6 +298,10 @@ class Stone(Geometry):
 
             self.bottom = np.array([0, 1, 2, 3])
             self.top = np.array([4, 5, 6, 7])
+            self.sides = np.array([[0, 1, 4, 5],  # front
+                                   [2, 3, 6, 7],  # back
+                                   [0, 3, 4, 7],  # left
+                                   [1, 2, 5, 6]])  # right
 
             # initialize triangles
             # self.triangles_values = [[] for _ in range(12)]  # 8 vertices -> 12 triangles
@@ -297,6 +330,8 @@ class Stone(Geometry):
             self.bottom = ind[:half]
             self.top = ind[half:]
 
+            # Todo: sides for arbitrary stones
+
         self.mesh = pymesh.form_mesh(vertices, triangles_index)
         self.update_properties()
 
@@ -321,6 +356,9 @@ class Stone(Geometry):
         self.top_n = np.cross(top[1] - top[0], top[2] - top[0])
 
         self.height = self.top_center[2] - self.bottom_center[2]
+
+        if np.any(self.sides):
+            self.sides_center = [self.mesh.vertices[s].mean(axis=0) for s in self.sides]
 
         # update triangle values
         self.calc_triangle_values()

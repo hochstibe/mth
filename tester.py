@@ -13,6 +13,15 @@ from trockenmauer.utils import load_from_pymesh
 from trockenmauer.math_utils import Translation, tetra_volume
 from trockenmauer.plot import set_axes_equal
 
+# Distance to boundary
+
+
+
+
+
+
+# ---------------------------------------------------------------
+# Tetrahedralization
 # s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
 s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0, scale=[1, 2])
 s2 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
@@ -46,6 +55,11 @@ tetra = load_from_pymesh('geometry', tetra, 'tetra')
 print('volume: .4 * .2 * .1 =', .4*.2*.1, np.linalg.norm(np.max(s1.mesh.vertices, axis=0) - np.min(s1.mesh.vertices, axis=0)))
 tetra_volume(tetra.mesh.vertices.T, tetra.mesh.voxels)
 
+distances, faces, points = pymesh.distance_to_mesh(tetra.mesh, [np.array([0, 0, 0]), np.array([.1, .1, .1])])
+print('distances', distances)
+print('faces', faces)
+print('points', points)
+
 
 # print('Closed meshes', mesh1.is_closed(), mesh2.is_closed(), intersection.is_closed(), mesh3.is_closed())
 
@@ -57,7 +71,6 @@ fig.add_axes(ax)
 # s3.add_shape_to_ax(ax, color='red')
 # merged.add_shape_to_ax(ax, color='orange')
 tetra.add_shape_to_ax(ax, color='cyan')
-
 
 set_axes_equal(ax)
 plt.show()

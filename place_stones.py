@@ -20,7 +20,8 @@ ax = Axes3D(fig, auto_add_to_figure=False)
 fig.add_axes(ax)
 boundary.add_shape_to_ax(ax)
 
-validator = Validator(intersection_boundary=True, intersection_stones=True)
+validator = Validator(intersection_boundary=True, intersection_stones=True,
+                      distance2boundary=True)
 
 # place stones
 
