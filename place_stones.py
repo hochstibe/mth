@@ -24,7 +24,7 @@ validator = Validator(intersection_boundary=True, intersection_stones=True)
 
 # place stones
 
-for i in range(30):
+for i in range(100):
     stone = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2], name=str(i))
     # Find a placement
     xyz = find_placement(wall)
@@ -41,10 +41,15 @@ for i in range(30):
     else:
         if errors.intersection_boundary:
             # Add the intersection to the plot
-            errors.intersection_boundary.add_shape_to_ax(ax, color='red')
+            # errors.intersection_boundary.add_shape_to_ax(ax, color='red')
+            # print(' boundary')
+            pass
         if errors.intersection_stones:
             # Add the intersection to the plot
-            errors.intersection_stones.add_shape_to_ax(ax, color='orange')
+            # for inter in errors.intersection_stones:
+                # inter.add_shape_to_ax(ax, color='orange')
+            # print(' stone')
+            pass
 
 print(f'Successfully placed {len(wall.stones)} stones.')
 

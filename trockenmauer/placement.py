@@ -21,14 +21,15 @@ def find_placement(wall: 'Wall'):
     z = 0.001  # on the ground (1mm above for cleaner intersections
 
     for stone in wall.stones:
-        minimum = stone.top.min(axis=0)
-        maximum = stone.top.max(axis=0)
+        minimum = stone.mesh.vertices[stone.top].min(axis=0)
+        maximum = stone.mesh.vertices[stone.top].max(axis=0)
 
         if minimum[0] < x < maximum[0] and minimum[1] < y < maximum[1]:
             # placement is on a stone
-            z_temp = stone.top_center[2]
+            # print('on a stone, maybe top stone')
+            z_temp = stone.top_center[2] + 0.001
             if z_temp > z:
                 # print('on top of a stone', z, z_temp)
-                z = z_temp
+                z = z_temp  # update z
 
     return np.array([x, y, z])

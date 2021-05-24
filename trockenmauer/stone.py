@@ -8,12 +8,55 @@ from typing import List
 
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import pymesh
+from aabbtree import AABB, AABBTree
 
 from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Transformation
 
-from pymesh import Mesh, form_mesh, merge_meshes
 
 NAMES = ['Achondrit', 'Adakit', 'Aleurit', 'Alkaligranit', 'Alnöit', 'Alvikit', 'Amphibolit', 'Anatexit', 'Andesit', 'Anhydrit', 'Anorthosit', 'Anthrazit', 'Aplit', 'Arenit', 'Arkose', 'Augengneis', 'Basalt', 'Basanit', 'Bauxit', 'Beforsit', 'Bentonit', 'Bergalith', 'Bimsstein', 'Biolithe', 'Blätterkohle', 'Blauschiefer', 'Bohnerz', 'Braunkohle', 'Brekzie', 'Buntsandstein', 'Bändererz', 'Buchit', 'Cancalit', 'Charnockit', 'Chert', 'Chloritschiefer', 'Chondrit', 'Cipollino', 'Dachschiefer', 'Dacit', 'Diabas', 'Diamiktit', 'Diatomit', 'Diorit', 'Dolerit', 'Dolomit', 'Dunit', 'Ehrwaldit', 'Eisenmeteorit', 'Eisenoolith', 'Eklogit', 'Enderbit', 'Erbsenstein', 'Essexit', 'Evaporit', 'Fanglomerat', 'Faserkohle', 'Felsit', 'Fenit', 'Fettkohle', 'Feuerstein', 'Fladenlava', 'Flammkohle', 'Fleckschiefer', 'Flint', 'Flysch', 'Foidit', 'Fortunit', 'Foyait', 'Fruchtschiefer', 'Fulgurit', 'Gabbro', 'Garbenschiefer', 'Gauteit', 'Gasflammkohle', 'Gaskohle', 'Gips', 'Glanz(braun)kohle', 'Glaukophanschiefer', 'Glimmerschiefer', 'Gneis', 'Granit', 'Granitporphyr', 'Granodiorit', 'Granophyr', 'Granulit', 'Graptolithenschiefer', 'Grauwacke', 'Griffelschiefer', 'Grünschiefer', 'Hälleflinta', 'Halitit', 'Hartbraunkohle', 'Harzburgit', 'Hawaiit', 'Hornblendit', 'Hornfels', 'Hornstein', 'Ignimbrit', 'Impaktit', 'Itakolumit', 'Jacupirangit', 'Jumillit', 'Kakirit', 'Kalisalze', 'Kalksandstein', 'Kalkstein', 'Kalksilikatfels', 'Kalksinter', 'Kalktuff', 'Kalziolith', 'Kännelkohle', 'Kaolin', 'Karbonatit', 'Karstmarmore', 'Kataklasit', 'Kennelkohle', 'Keratophyr', 'Kersantit', 'Khondalit', 'Kieselerde', 'Kieselgur', 'Kieselschiefer', 'Kieselsinter', 'Kimberlit', 'Kissenlava', 'Klingstein', 'Knochenbrekzie', 'Knotenschiefer', 'Kohle', 'Kohleeisenstein', 'Kohlenkalk', 'Kokardenerz', 'Konglomerat', 'Kontaktschiefer', 'Korallenerz', 'Kreide', 'Kuckersit', 'Lamproit', 'Lamprophyr', 'Lapilli', 'Lapislazuli', 'Larvikit', 'Lava', 'Latit', 'Lehm', 'Leptynit', 'Letten', 'Leucitit', 'Lherzolith', 'Lignit', 'Limburgit', 'Listwänit', 'Liparit', 'Liptobiolith', 'Lockergestein', 'Löss', 'Lutit', 'Lydit', 'Madupit', 'Magerkohle', 'Mafitit', 'Mandelstein', 'Manganknollen', 'Marmor', 'Massenkalk', 'Mattkohle', 'Meimechit', 'Melaphyr', 'Melilithit', 'Mergel', 'Mergelschiefer', 'Mergelstein', 'Meteorit', 'Migmatit', 'Mikrogabbro', 'Mikrogranit', 'Minette (Ganggestein)', 'Minette (Erz)', 'Moldavit', 'Monchiquit', 'Monzonit', 'MORB', 'Mugearit', 'Mylonit', 'Nephelinbasalt', 'Nephelinit', 'Nephelinsyenit', 'Norit', 'Obsidian', 'OIB', 'Ölschiefer', 'Oolith', 'Ophicalcit', 'Ophiolith', 'Ophit', 'Orendit', 'Pallasit', 'Pechstein', 'Pantellerit', 'Pegmatit', 'Perlit', 'Peridotit', 'Phonolith', 'Phyllit', 'Pikrit', 'Pläner', 'Polzenit', 'Porphyr', 'Porphyrit', 'Prasinit', 'Pseudotachylit', 'Pyroxenit', 'Quarzit', 'Quarzolith', 'Quarzporphyr', 'Radiolarit', 'Rapakiwi', 'Raseneisenstein', 'Rauhaugit', 'Rhyolith', 'Rodingit', 'Rogenstein', 'Sagvandit', 'Sannait', 'Sandstein', 'Schalstein', 'Schiefer', 'Schwarzpelit', 'Serpentinit', 'Shonkinit', 'Silikat-Perowskit', 'Siltstein', 'Skarn', 'Sonnenbrennerbasalt', 'Sövit', 'Spessartit', 'Spiculit', 'Spilit', 'Steinkohle', 'Steinsalz', 'Steinmeteorit', 'Suevit', 'Syenit', 'Talk-Disthen-Schiefer', 'Tektit', 'Tephrit', 'Teschenit', 'Tachylit', 'Theralith', 'Tholeiit', 'Tonalit', 'Tonschiefer', 'Tonstein', 'Trachyt', 'Travertin', 'Troktolith', 'Trondhjemit', 'Tropfstein', 'Tuffstein', 'Unakit', 'Verit', 'Weißschiefer', 'Websterit', 'Wyomingit']  # noqa
+
+
+class Wall:
+    """
+    A wall consists of the placed stones and the boundary.
+    """
+
+    def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'pymesh.Mesh' = None):
+        self.boundary = boundary
+        self.stones = stones
+        self.mesh = mesh
+
+        # Bounding Volume Hierarchy (axis aligned bounding boxes)
+        # Use separate trees for different stone sizes (e.g. one for normal stones, one for filler stones)
+        # AABBTree is a static tree (easy to use),
+        # Todo: for simulation (placement finder), probably a dynamic tree is necessary
+        # https://github.com/lohedges/aabbcc -> c++ with python wrapper, no pythonic interface
+        self.tree: 'AABBTree' = AABBTree()
+
+        if not self.stones:
+            self.stones = []
+            # self.mesh = form_mesh(np.array([0, 0, 0]), np.array([]))
+
+    def add_stone(self, stone: 'Stone'):
+        # Add the stone to the mesh
+        if not self.mesh:
+            self.mesh = stone.mesh
+        else:
+            # Merging the mesh
+            self.mesh = pymesh.merge_meshes([self.mesh, stone.mesh])
+            # self.mesh = pymesh.boolean(self.mesh, stone.mesh, 'union', engine='cgal')  # alternative to merge
+            # Todo: Merging separate meshes adds a connection. It would work, if all stones are adjacent
+            # -> for the moment, to check intersections, all individual stones have to be checked
+
+        # Add the stone to the list to keep track of the individual stones
+        self.stones.append(stone)
+        i = len(self.stones) - 1  # index of the stone
+        # Add the BB to the tree, the name of the stone is the index in the stones-list
+        self.tree.add(stone.aabb, i)
+
+    def __repr__(self):
+        return f'<Wall(boundary={self.boundary}, stones={self.stones})>'
 
 
 class Geometry:
@@ -21,17 +64,23 @@ class Geometry:
     Generic class for a geometrical object
     """
     name: str = None
-    mesh: 'Mesh' = None
+    mesh: 'pymesh.Mesh' = None
     triangles_values: np.ndarray = None  # triangle coordinates
+    aabb: 'AABB' = None  # axis aligned bounding box
 
-    def __init__(self, mesh: 'Mesh' = None, name: str = None):
+    def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
         if mesh:
             self.mesh = mesh
             self.calc_triangle_values()
+            self.calc_aabb()
 
     def calc_triangle_values(self):
         self.triangles_values = [[self.mesh.vertices[j] for j in t_ind] for t_ind in self.mesh.faces]
+
+    def calc_aabb(self):
+        corners = np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)]).T
+        self.aabb = AABB(corners)
 
     def add_shape_to_ax(self, ax, color='red'):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
@@ -46,32 +95,17 @@ class Geometry:
         return f'<Geometry(name={self.name})>'
 
 
-class Wall:
+class Intersection(Geometry):
     """
-    A wall consists of the placed stones and the boundary.
+    Intersection of geometries
     """
+    def __init__(self, mesh: 'pymesh.Mesh' = None, bb: 'AABB' = None, bb_volume: float = None, name: str = None):
+        # if there is a mesh, __init__ adds the mesh, calculates triangle values and the aabb
+        super().__init__(mesh, name)
 
-    def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'Mesh' = None):
-        self.boundary = boundary
-        self.stones = stones
-        self.mesh = mesh
-
-        if not self.stones:
-            self.stones = []
-            # self.mesh = form_mesh(np.array([0, 0, 0]), np.array([]))
-
-    def add_stone(self, stone: 'Stone'):
-        # Add the stone to the mesh
-        if not self.mesh:
-            self.mesh = stone.mesh
-        else:
-            self.mesh = merge_meshes([self.mesh, stone.mesh])
-
-        # Add the stone to the list to keep track of the individual stones
-        self.stones.append(stone)
-
-    def __repr__(self):
-        return f'<Wall(boundary={self.boundary}, stones={self.stones})>'
+        if bb:
+            self.aabb = bb
+        self.aabb_volume = bb_volume
 
 
 class Boundary(Geometry):
@@ -122,9 +156,9 @@ class Boundary(Geometry):
         ])
 
         # the mesh is only with the bounding planes (bottom and sides) for plotting
-        self.mesh = form_mesh(vertices[:8], triangles_index[:10])
+        self.mesh = pymesh.form_mesh(vertices[:8], triangles_index[:10])
         # the solid mesh can be used for boolean operations (intersection)
-        self.mesh_solid = form_mesh(vertices, triangles_index)
+        self.mesh_solid = pymesh.form_mesh(vertices, triangles_index)
         self.calc_triangle_values()
 
         self.bottom = np.array([a, b, c, d])
@@ -232,9 +266,9 @@ class Stone(Geometry):
             # update the vertices
             vertices = np.array([a, b, c, d,  # lower 4 vertices
                                  e, f, g, h])  # upper 4 vertices
-            # Todo: Top / bottom only index, not coordinates
-            self.bottom = vertices[:4]
-            self.top = vertices[4:]
+
+            self.bottom = np.array([0, 1, 2, 3])
+            self.top = np.array([4, 5, 6, 7])
 
             # initialize triangles
             # self.triangles_values = [[] for _ in range(12)]  # 8 vertices -> 12 triangles
@@ -254,15 +288,16 @@ class Stone(Geometry):
             ])
 
         else:
+            # The triangles are already defined
             triangles_index = triangles_index
 
             # set the lower half of the vertices as the bottom vertices
             ind = np.argsort(vertices[:, 2])
             half = int(len(vertices) / 2)
-            self.bottom = vertices[ind[:half]]
-            self.top = vertices[ind[half:]]
+            self.bottom = ind[:half]
+            self.top = ind[half:]
 
-        self.mesh = form_mesh(vertices, triangles_index)
+        self.mesh = pymesh.form_mesh(vertices, triangles_index)
         self.update_properties()
 
     def update_properties(self):
@@ -276,19 +311,22 @@ class Stone(Geometry):
         self.center = self.mesh.vertices.mean(axis=0)
         self.eigenvalue, self.eigenvector = self.pca()
 
-        self.bottom_center = self.bottom.mean(axis=0)
+        bottom = self.mesh.vertices[self.bottom]
+        self.bottom_center = bottom.mean(axis=0)
         # Normal is a crude approximation (true, if the bottom points lie in a plane)
-        self.bottom_n = np.cross(self.bottom[0] - self.bottom[1], self.bottom[2] - self.bottom[0])
+        self.bottom_n = np.cross(bottom[0] - bottom[1], bottom[2] - bottom[0])
 
-        self.top_center = self.top.mean(axis=0)
-        self.top_n = np.cross(self.top[1] - self.top[0], self.top[2] - self.top[0])
+        top = self.mesh.vertices[self.top]
+        self.top_center = top.mean(axis=0)
+        self.top_n = np.cross(top[1] - top[0], top[2] - top[0])
 
         self.height = self.top_center[2] - self.bottom_center[2]
 
         # update triangle values
         self.calc_triangle_values()
-        # self.triangles_values = [[self.vertices[j] for j in t_ind] for t_ind in self.triangles_index]
-        # self.triangles_values = [self.vertices[j] for t_ind in self.triangles_index for j in t_ind]
+
+        # update the bounding box
+        self.calc_aabb()
 
     def pca(self, vertices: np.ndarray = None):
         """
@@ -313,7 +351,7 @@ class Stone(Geometry):
 
         v = transformation.transform(self.mesh.vertices.T)
         # Rewrite mesh (not possible to update?)
-        self.mesh = form_mesh(v.T, self.mesh.faces)
+        self.mesh = pymesh.form_mesh(v.T, self.mesh.faces)
         # self.mesh.vertices = v.T
         self.update_properties()
 
@@ -362,7 +400,7 @@ class Stone(Geometry):
             # components of the eigenvector
             # use positive eigenvectors (e_vec can direct wrong direction (180°))
             if positive_eigenvec:
-                x, y, z = np.sign(vec)*vec
+                x, y, z = np.abs(vec)
             # use the correct direction of eigenvectors
             else:
                 x, y, z = vec
@@ -381,18 +419,6 @@ class Stone(Geometry):
     #     self.add_shape_to_ax(ax, color)
     #     self.add_labels_to_ax(ax, positive_eigenvec=positive_eigenvec)
     #     return ax
-
-    # def plot(self):
-    #     """
-    #     Plot the stone
-    #     :return:
-    #     """
-    #     fig = plt.figure()
-    #     ax = Axes3D(fig)
-    #     self.add_shape_to_ax(ax)
-    #     self.add_labels_to_ax(ax)
-    #     set_axes_equal(ax)
-    #     plt.show()
 
     def __repr__(self):
         return f'<Stone(name={self.name}, vertices={len(self.mesh.vertices)})>'
