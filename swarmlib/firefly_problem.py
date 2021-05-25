@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 class FireflyProblem:
     def __init__(self, firefly_number, function, lower_boundary=0, upper_boundary=1, alpha=0.25, beta=1, gamma=0.97,
-                 iteration_number=100, seed=None, **kwargs):
+                 iteration_number=100, seed=None, init_function=None, **kwargs):
         """Initializes a new instance of the `FireflyProblem` class.
 
         Keyword arguments:  \r
@@ -36,7 +36,7 @@ class FireflyProblem:
         # Create fireflies
         self.__fireflies = [
             Firefly(alpha, beta, gamma, lower_boundary, upper_boundary, function,
-                    bit_generator=self._random,  **kwargs)
+                    bit_generator=self._random, init_function=init_function,  **kwargs)
             for _ in range(firefly_number)
         ]
 

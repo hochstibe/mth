@@ -110,7 +110,9 @@ class Intersection(Geometry):
 
         if bb:
             self.aabb = bb
-        self.aabb_volume = bb_volume
+            self.aabb_volume = self.aabb.volume
+        elif bb_volume:
+            self.aabb_volume = bb_volume
 
         if self.mesh and np.any(self.mesh.voxels):
             self.mesh_volume = tetra_volume(mesh.vertices.T, mesh.voxels)

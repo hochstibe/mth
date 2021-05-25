@@ -21,12 +21,14 @@ fig.add_axes(ax)
 boundary.add_shape_to_ax(ax)
 
 validator = Validator(intersection_boundary=True, intersection_stones=True,
-                      distance2boundary=True)
+                      distance2boundary=True,
+                      volume_below_stone=True
+                      )
 
 # place stones
 
-for i in range(20):
-    stone = generate_regular_stone(.3, 0.2, 0.1, edge_noise=0.2, scale=[1, 2], name=str(i))
+for i in range(30):
+    stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(i))
     # Find a placement
     xyz = find_placement(wall)
     t = Translation(translation=xyz - stone.bottom_center)
@@ -39,6 +41,7 @@ for i in range(20):
         # add the stone to the wall and to the plot
         wall.add_stone(stone)
         stone.add_shape_to_ax(ax)
+        print(errors.volume_below_stone, stone.mesh_volume, errors.volume_below_stone / stone.mesh_volume)
     else:
         if errors.intersection_boundary:
             # Add the intersection to the plot

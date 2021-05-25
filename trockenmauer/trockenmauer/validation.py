@@ -8,13 +8,14 @@ from dataclasses import dataclass
 
 import numpy as np
 import pymesh
+from aabbtree import AABB
 
 from .stone import Intersection
 from .math_utils import Translation
 
 if TYPE_CHECKING:
     from .stone import Stone, Boundary, Wall
-    from aabbtree import AABB, AABBTree
+    from aabbtree import AABBTree
 
 
 class Validator:
@@ -36,7 +37,7 @@ class Validator:
     """
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
-                 distance2boundary=False):
+                 distance2boundary=False, volume_below_stone=False):
         """
         The parameters control, witch validations will be executed
 
@@ -46,6 +47,7 @@ class Validator:
         self.intersection_boundary = intersection_boundary
         self.intersection_stones = intersection_stones
         self.distance2boundary = distance2boundary
+        self.volume_below_stone = volume_below_stone
 
         # initialize tetgen for tetrahedralization
         self.tetgen = pymesh.tetgen()
@@ -58,8 +60,8 @@ class Validator:
         # for i, box in zip(tree.overlap_values(bb), tree.overlap_aabbs(bb)):
         #     print(i, bb.overlap_volume(box))
 
-        # return for each intersection the index in walls.stone (name in tree) and the volume
-        return [Intersection(bb_volume=bb.overlap_volume(box), name=i)
+        # return for each intersection the index in walls.stone (name in tree) and the bb (+ volume)
+        return [Intersection(bb=bb.overlap_aabb(box), name=i)
                 for i, box in zip(tree.overlap_values(bb), tree.overlap_aabbs(bb))]
         # slow? overlap is calculated 2x, maybe only overlap_values and use the index in the list of stones
         # wall instead of tree would be needed
@@ -71,7 +73,7 @@ class Validator:
         try:
             intersection = pymesh.boolean(mesh1, mesh2, "intersection", engine='cgal')
         except RuntimeError as err:
-            print(err)
+            # print(err)
             intersection = None
 
         return intersection
@@ -141,8 +143,16 @@ class Validator:
         return np.sqrt(np.min(distances))
 
     def _volume_below_stone(self, stone: 'Stone', wall: 'Wall'):
-        # calculate the footprint
-        footprint = stone.mesh
+        # Approximation with bounding box -> with mesh, it is harder to have the outer hull footprint
+        # print(stone.aabb_limits)
+        # bounding box of the volume below the stone
+        bb = AABB(np.vstack((stone.aabb[:2, :], [0, stone.aabb[2, 0]])))
+
+        # subtract the volume of intersection stones below
+        inter = self._bb_intersections(wall.tree, bb)
+        vol_inter = np.sum([i.aabb.volume for i in inter])
+
+        return bb.volume - vol_inter
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
@@ -174,9 +184,13 @@ class Validator:
             d = self._min_distance2boundary(stone, wall.boundary)
             results.distance2boundary = d
 
+        if self.volume_below_stone:
+            v = self._volume_below_stone(stone, wall)
+            results.volume_below_stone = v
+
         return passed, results
 
-    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall'):
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs):
         """
         Calculates the fitness of a placement for a stone.
 
@@ -189,7 +203,19 @@ class Validator:
         t = Translation(translation=firefly - stone.bottom_center)
         stone.transform(transformation=t)
         passed, res = self.validate(stone, wall)
-        return res.intersection_volume / stone.mesh_volume + res.distance2boundary
+
+        # balance the separate terms:
+        # - volume: fraction of the volume of the stone [0-1]
+        # - distance2boundary: wall width: 0.5 -> max_distance ~ 0.2 -> d*5 -> [0-1]
+        # - volume below the stone
+        score = 0
+        if self.intersection_boundary or self.intersection_stones:
+            score += 1 * res.intersection_volume / stone.mesh_volume
+        if self.distance2boundary:
+            score += 5*res.distance2boundary
+        if self.volume_below_stone:
+            score += res.volume_below_stone / stone.mesh_volume
+        return score
 
 
 @dataclass
@@ -202,6 +228,7 @@ class ValidationResult:
     _intersection_stones: List['Intersection'] = False
     intersection_volume: float = 0
     distance2boundary: float = None
+    volume_below_stone: float = None
 
     @property
     def intersection_boundary(self) -> 'Intersection':

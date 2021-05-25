@@ -9,7 +9,8 @@ import numpy as np
 
 
 class Firefly:
-    def __init__(self, alpha, beta, gamma, lower_boundary, upper_boundary, function, bit_generator, **kwargs):
+    def __init__(self, alpha, beta, gamma, lower_boundary, upper_boundary, function,
+                 bit_generator, init_function, **kwargs):
 
         self.__alpha = alpha
         self.__beta = beta
@@ -21,6 +22,7 @@ class Firefly:
         # self._random = bit_generator
         self._random = bit_generator
         self._function = function
+        self._init_function = init_function
         self._kwargs = kwargs  # additional arguments fur the function
 
         self.__value = None
@@ -43,7 +45,9 @@ class Firefly:
         """
         Initialize a new random position and its value
         """
-        self._position = self._random.uniform(self.__lower_boundary, self.__upper_boundary, 3)
+        position = self._random.uniform(self.__lower_boundary, self.__upper_boundary, 3)
+        if self._init_function:
+            self._position = self._init_function(position, **self._kwargs)
 
     @property
     def position(self) -> np.ndarray:
