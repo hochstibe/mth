@@ -67,6 +67,7 @@ class Geometry:
     mesh: 'pymesh.Mesh' = None
     triangles_values: np.ndarray = None  # triangle coordinates
     aabb: 'AABB' = None  # axis aligned bounding box
+    aabb_limits: np.ndarray = None  # [[xmin, ymin, zmin], [xmax, ymax, zmax]]
 
     def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
@@ -81,6 +82,7 @@ class Geometry:
     def calc_aabb(self):
         corners = np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)]).T
         self.aabb = AABB(corners)
+        self.aabb_limits = np.array([np.min(self.aabb.corners, axis=0), np.max(self.aabb.corners, axis=0)])
 
     def add_shape_to_ax(self, ax, color='red'):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
@@ -176,8 +178,8 @@ class Boundary(Geometry):
             [3, 4, 0], [3, 7, 4],  # left
             [1, 6, 2], [1, 5, 6],  # right
             # outer for creating a solid
-            [0, 1, 8], [0, 1, 9], [1, 2, 9], [1, 2, 10],  # bottom
-            [2, 3, 10], [2, 3, 11], [3, 0, 11], [3, 0, 8],  # bottom
+            [0, 1, 8], [1, 9, 8], [1, 2, 9], [2, 10, 9],  # bottom
+            [2, 3, 10], [3, 11, 10], [3, 0, 11], [0, 8, 11],  # bottom
             [8, 9, 13], [8, 13, 12],  # front
             [10, 11, 15], [10, 15, 14],  # back
             [11, 8, 12], [11, 12, 15],  # left
@@ -186,13 +188,9 @@ class Boundary(Geometry):
             [14, 15, 7], [14, 7, 6], [15, 12, 4], [15, 4, 7],  # top
         ])
         self.mesh_solid_sides = pymesh.form_mesh(vertices, triangles_index)
-        # self.mesh = self.mesh_solid_sides
-        # self.calc_triangle_values()
 
-        # self.front_mesh = pymesh.form_mesh(np.array([a, b, f, e]), np.array([[0, 5, 1], [0, 4, 5]]))
-        # self.back_mesh = pymesh.form_mesh(np.array([d, c, g, h]), np.array([[2, 7, 3], [2, 6, 7]]))
-        # self.left = np.array([a, e, h, d])
-        # self.right = np.array([b, f, g, c])
+        # Add the boundignbox and its corners
+        self.calc_aabb()
 
     def add_shape_to_ax(self, ax, color='grey'):
         """
@@ -340,6 +338,18 @@ class Stone(Geometry):
 
         self.mesh = pymesh.form_mesh(vertices, triangles_index)
         self.update_properties()
+
+        # calculate the volume
+        tetgen = pymesh.tetgen()
+        tetgen.max_tet_volume = 2
+        tetgen.verbosity = 0
+        tetgen.split_boundary = False
+        tetgen.points = self.mesh.vertices
+        tetgen.triangles = self.mesh.faces
+        tetgen.run()
+        tetra = tetgen.mesh
+        # tetra = pymesh.tetrahedralize(self.mesh, 2, engine='tetgen')
+        self.mesh_volume = tetra_volume(tetra.vertices.T, tetra.voxels)
 
     def update_properties(self):
         """

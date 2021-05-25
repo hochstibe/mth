@@ -9,12 +9,11 @@ from dataclasses import dataclass
 import numpy as np
 import pymesh
 
-from .utils import load_from_pymesh
 from .stone import Intersection
 from .math_utils import Translation
 
 if TYPE_CHECKING:
-    from .stone import Geometry, Stone, Boundary, Wall
+    from .stone import Stone, Boundary, Wall
     from aabbtree import AABB, AABBTree
 
 
@@ -52,6 +51,7 @@ class Validator:
         self.tetgen = pymesh.tetgen()
         self.tetgen.max_tet_volume = 2
         self.tetgen.verbosity = 0  # no output
+        self.tetgen.split_boundary = False
 
     @staticmethod
     def _bb_intersections(tree: 'AABBTree', bb: 'AABB') -> List['Intersection']:
@@ -85,13 +85,13 @@ class Validator:
         :param wall: Boundary object
         :return: Status: True (there is an intersection) / False (no intersection; intersection mesh
         """
-        intersection = self._mesh_intersection(stone.mesh, wall.boundary.mesh_solid)
+        intersection = self._mesh_intersection(stone.mesh, wall.boundary.mesh_solid_sides)
         if intersection and np.any(intersection.vertices):
+            # run tetrahedalization
             self.tetgen.points = intersection.vertices
             self.tetgen.triangles = intersection.faces
             self.tetgen.run()
             intersection = self.tetgen.mesh
-            print(len(intersection.voxels))
             intersection = Intersection(mesh=intersection)
             # intersection = pymesh.tetrahedralize(intersection, 20, engine='tetgen')
             # intersection = load_from_pymesh('intersection', intersection, 'boundary intersection')
@@ -140,6 +140,10 @@ class Validator:
         distances = self._distance2mesh(stone.sides_center, boundary.mesh_solid_sides)
         return np.sqrt(np.min(distances))
 
+    def _volume_below_stone(self, stone: 'Stone', wall: 'Wall'):
+        # calculate the footprint
+        footprint = stone.mesh
+
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
         Validates the new stone to the built wall. All validation functions are used according to the
@@ -172,11 +176,10 @@ class Validator:
 
         return passed, results
 
-    def fitness(self, n_dim: int, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall'):
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall'):
         """
         Calculates the fitness of a placement for a stone.
 
-        :param n_dim: Number of dimensions: 3 for x, y, z
         :param firefly: Firefly with the three coordinates as genes
         :param stone:
         :param wall:
@@ -186,7 +189,7 @@ class Validator:
         t = Translation(translation=firefly - stone.bottom_center)
         stone.transform(transformation=t)
         passed, res = self.validate(stone, wall)
-        return res.intersection_volume + res.distance2boundary
+        return res.intersection_volume / stone.mesh_volume + res.distance2boundary
 
 
 @dataclass

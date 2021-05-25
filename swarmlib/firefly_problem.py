@@ -3,18 +3,19 @@
 #  Licensed under the BSD 3-Clause License. See LICENSE.txt in the project root for license information.
 # ------------------------------------------------------------------------------------------------------
 
-from copy import deepcopy
+from copy import copy  # deepcopy
 import logging
 
-from .firefly import Firefly
-from ..util.base_visualizer import BaseVisualizer
-from ..util.problem_base import ProblemBase
+from numpy.random import default_rng
+
+from swarmlib.firefly import Firefly
 
 LOGGER = logging.getLogger(__name__)
 
 
-class FireflyProblem(ProblemBase):
-    def __init__(self, **kwargs):
+class FireflyProblem:
+    def __init__(self, firefly_number, function, lower_boundary=0, upper_boundary=1, alpha=0.25, beta=1, gamma=0.97,
+                 iteration_number=100, seed=None, **kwargs):
         """Initializes a new instance of the `FireflyProblem` class.
 
         Keyword arguments:  \r
@@ -29,17 +30,19 @@ class FireflyProblem(ProblemBase):
         `interval`         -- Interval between two animation frames in ms (default 500)  \r
         `continuous`       -- Indicates whether the algorithm should run continuously (default False)
         """
-        super().__init__(**kwargs)
-        self.__iteration_number = kwargs.get('iteration_number', 10)
+
+        self._random = default_rng(seed)
+        self.__iteration_number = iteration_number
         # Create fireflies
         self.__fireflies = [
-            Firefly(**kwargs, bit_generator=self._random)
-            for _ in range(kwargs['firefly_number'])
+            Firefly(alpha, beta, gamma, lower_boundary, upper_boundary, function,
+                    bit_generator=self._random,  **kwargs)
+            for _ in range(firefly_number)
         ]
 
         # Initialize visualizer for plotting
-        self._visualizer = BaseVisualizer(**kwargs)
-        self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
+        # self._visualizer = BaseVisualizer(**kwargs)
+        # self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
 
     def solve(self) -> Firefly:
         """Solve the problem."""
@@ -52,7 +55,8 @@ class FireflyProblem(ProblemBase):
 
             current_best = min(self.__fireflies)
             if not best or current_best < best:
-                best = deepcopy(current_best)
+                # best = deepcopy(current_best)
+                best = copy(current_best)
 
             LOGGER.info('Current best value: %s, Overall best value: %s', current_best.value, best.value)
 
@@ -60,6 +64,6 @@ class FireflyProblem(ProblemBase):
             current_best.random_walk(0.1)
 
             # Add data for visualization
-            self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
+            # self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
 
         return best

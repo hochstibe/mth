@@ -25,8 +25,8 @@ validator = Validator(intersection_boundary=True, intersection_stones=True,
 
 # place stones
 
-for i in range(100):
-    stone = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2], name=str(i))
+for i in range(20):
+    stone = generate_regular_stone(.3, 0.2, 0.1, edge_noise=0.2, scale=[1, 2], name=str(i))
     # Find a placement
     xyz = find_placement(wall)
     t = Translation(translation=xyz - stone.bottom_center)

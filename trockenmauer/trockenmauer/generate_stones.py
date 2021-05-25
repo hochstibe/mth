@@ -12,7 +12,7 @@ from .stone import Stone
 
 
 def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (1, 1),
-                           edge_noise: float = 0.5,
+                           edge_noise: float = 0.3,
                            name: str = None) -> 'Stone':
     """
     Stone generator for target size (in meter), uniform noise
@@ -28,9 +28,12 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (
     scale = random.uniform(scale[0], scale[1])
 
     # Coordinates of one corner (first quadrant, all coordinates positive)
-    x = scale * random.uniform(x / 2 - x*edge_noise, x / 2 + x*edge_noise)
-    y = scale * random.uniform(y / 2 - y*edge_noise, y / 2 + y*edge_noise)
-    z = scale * random.uniform(z / 2 - z*edge_noise, z / 2 + z*edge_noise)
+    x = scale * random.uniform(x - x * (edge_noise / 2),  x + x * (edge_noise / 2))
+    y = scale * random.uniform(y - y * (edge_noise / 2),  y + y * (edge_noise / 2))
+    z = scale * random.uniform(z - z * (edge_noise / 2),  z + z * (edge_noise / 2))
+    # x = scale * random.uniform(-x / 2, x / 2)
+    # y = scale * random.uniform (-y / 2, y / 2)
+    # z = scale * random.uniform(-z / 2, z / 2)
 
     a = [0, 0, 0]
     b = [x, 0, 0]
