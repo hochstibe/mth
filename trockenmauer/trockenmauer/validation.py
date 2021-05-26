@@ -8,14 +8,12 @@ from dataclasses import dataclass
 
 import numpy as np
 import pymesh
-from aabbtree import AABB
 
 from .stone import Intersection
 from .math_utils import Translation
 
 if TYPE_CHECKING:
     from .stone import Stone, Boundary, Wall
-    from aabbtree import AABBTree
 
 
 class Validator:
@@ -56,15 +54,17 @@ class Validator:
         self.tetgen.split_boundary = False
 
     @staticmethod
-    def _bb_intersections(tree: 'AABBTree', bb: 'AABB') -> List['Intersection']:
-        # for i, box in zip(tree.overlap_values(bb), tree.overlap_aabbs(bb)):
-        #     print(i, bb.overlap_volume(box))
+    def _bb_intersections(wall: 'Wall', bb: 'np.ndarray') -> List['Intersection']:
 
-        # return for each intersection the index in walls.stone (name in tree) and the bb (+ volume)
-        return [Intersection(bb=bb.overlap_aabb(box), name=i)
-                for i, box in zip(tree.overlap_values(bb), tree.overlap_aabbs(bb))]
-        # slow? overlap is calculated 2x, maybe only overlap_values and use the index in the list of stones
-        # wall instead of tree would be needed
+        hits = wall.r_tree.intersection(bb.flatten(), objects=False)  # -> list of indices in index
+
+        intersections = list()
+        for i in hits:
+            limits = wall.stones[i].aabb_overlap(bb)
+            if np.any(limits):  # rtree returns a hit for adjacent boxes
+                intersections.append(Intersection(bb_limits=limits))
+
+        return intersections
 
     @staticmethod
     def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> Union[None, 'pymesh.Mesh']:
@@ -95,9 +95,8 @@ class Validator:
             self.tetgen.run()
             intersection = self.tetgen.mesh
             intersection = Intersection(mesh=intersection)
-            # intersection = pymesh.tetrahedralize(intersection, 20, engine='tetgen')
-            # intersection = load_from_pymesh('intersection', intersection, 'boundary intersection')
             return True, intersection
+
         else:
             return False, None
 
@@ -111,26 +110,17 @@ class Validator:
         :return:
         """
         # Todo: at the moment: only intersect the bounding boxes
-        if not wall.mesh:
+        if not wall.stones:
             # No stone was placed yet
             return False, None
 
         # calculate bb intersections
-        intersections = self._bb_intersections(tree=wall.tree, bb=stone.aabb)
+        intersections = self._bb_intersections(wall, stone.aabb_limits)
 
-        # calculate mesh intersections for all bb-intersections
-        # intersections = [self._mesh_intersection(stone.mesh, wall_stone.mesh) for wall_stone in wall.stones]
-        # intersections = [load_from_pymesh('geometry', i, 'stone intersection') for i in intersections if np.any(i.vertices)]  # remove empty intersections
         if intersections:
             return True, intersections
         else:
             return False, None
-        # intersection = self._mesh_intersection(stone.mesh, wall.mesh)
-        # if np.any(intersection.vertices):
-        #     intersection = load_from_pymesh('geometry', intersection, 'stone intersection')
-        #     return True, intersection
-        # else:
-        #     return False, None
 
     @staticmethod
     def _distance2mesh(points: List[np.ndarray], mesh: 'pymesh.Mesh') -> List:
@@ -144,15 +134,19 @@ class Validator:
 
     def _volume_below_stone(self, stone: 'Stone', wall: 'Wall'):
         # Approximation with bounding box -> with mesh, it is harder to have the outer hull footprint
-        # print(stone.aabb_limits)
         # bounding box of the volume below the stone
-        bb = AABB(np.vstack((stone.aabb[:2, :], [0, stone.aabb[2, 0]])))
+        # [[1, 2, 3], [4, 5, 6]] -> [[1, 2, 0], [4, 5, 3]]
+        bb = np.hstack((stone.aabb_limits[:, :2], [[0], [stone.aabb_limits[0, 2]]]))
+        bb_vol = np.prod(bb[1] - bb[0])
 
         # subtract the volume of intersection stones below
-        inter = self._bb_intersections(wall.tree, bb)
-        vol_inter = np.sum([i.aabb.volume for i in inter])
+        intersections = self._bb_intersections(wall, bb)
+        vol_inter = np.sum(i.aabb_volume for i in intersections)
 
-        return bb.volume - vol_inter
+        return bb_vol - vol_inter
+
+    def _closest_stone(self, stone:'Stone', wall: 'Wall'):
+        pass
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
@@ -209,10 +203,13 @@ class Validator:
         # - distance2boundary: wall width: 0.5 -> max_distance ~ 0.2 -> d*5 -> [0-1]
         # - volume below the stone
         score = 0
-        if self.intersection_boundary or self.intersection_stones:
-            score += 1 * res.intersection_volume / stone.mesh_volume
+        # intersection volume
+        if res.intersection:
+            score += 1 + 10 * res.intersection_volume / stone.mesh_volume
+        # Distance to boundary
         if self.distance2boundary:
             score += 5*res.distance2boundary
+        # free volume below the stone
         if self.volume_below_stone:
             score += res.volume_below_stone / stone.mesh_volume
         return score
@@ -224,39 +221,46 @@ class ValidationResult:
     Storing all validation results. The total intersection volume gets automatically updated,
     if a boundary intersection or stones intersection is set.
     """
-    _intersection_boundary: 'Intersection' = False
-    _intersection_stones: List['Intersection'] = False
-    intersection_volume: float = 0
-    distance2boundary: float = None
-    volume_below_stone: float = None
+    __intersection_boundary: 'Intersection' = False  # Intersection with the boundary
+    __intersection_stones: List['Intersection'] = False  # All Intersections with other stones
+    _intersection: bool = False  # whether there is any intersection or not
+    _intersection_volume: float = 0  # total intersection volume
+    distance2boundary: float = 0  # minimal distance to the boundary
+    volume_below_stone: float = 0  # total free volume below the stone
 
     @property
     def intersection_boundary(self) -> 'Intersection':
-        return self._intersection_boundary
+        return self.__intersection_boundary
 
     @property
     def intersection_stones(self) -> List['Intersection']:
-        return self._intersection_stones
+        return self.__intersection_stones
+
+    @property
+    def intersection(self) -> bool:
+        return self._intersection
+
+    @property
+    def intersection_volume(self) -> float:
+        return self._intersection_volume
 
     @intersection_boundary.setter
     def intersection_boundary(self, new_intersection: 'Intersection'):
-        # print('set boundary volume')
-        self._intersection_boundary = new_intersection
+        self.__intersection_boundary = new_intersection
+        self._intersection = True
         self.update_total_volume(new_intersection)
 
     @intersection_stones.setter
     def intersection_stones(self, new_intersections: List['Intersection']):
-        # print('set intersection volume: old vol', self.intersection_volume)
-        self._intersection_stones = new_intersections
-        for i in new_intersections:
-            self.update_total_volume(i)
+        self.__intersection_stones = new_intersections
+        self._intersection = True
+        map(self.update_total_volume, new_intersections)
 
     def update_total_volume(self, new_intersection: 'Intersection'):
+        # update the volume: try first the exact mesh volume. if not available, use aabb volume
         if new_intersection.mesh_volume:
-            self.intersection_volume += new_intersection.mesh_volume
-            # print('mesh volume updated')
+            self._intersection_volume += new_intersection.mesh_volume
         elif new_intersection.aabb_volume:
-            self.intersection_volume += new_intersection.aabb_volume
-            # print('aabb volume updated')
+            self._intersection_volume += new_intersection.aabb_volume
         else:
             print('intersection but no volume added')

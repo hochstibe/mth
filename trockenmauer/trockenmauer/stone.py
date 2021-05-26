@@ -4,12 +4,12 @@
 #
 
 import random
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import pymesh
-from aabbtree import AABB, AABBTree
+from rtree import index
 
 from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Transformation, tetra_volume
 
@@ -21,6 +21,9 @@ class Wall:
     """
     A wall consists of the placed stones and the boundary.
     """
+    boundary: 'Boundary' = None
+    stones: List['Stone'] = []
+    mesh: 'pymesh.Mesh' = None
 
     def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'pymesh.Mesh' = None):
         self.boundary = boundary
@@ -29,14 +32,11 @@ class Wall:
 
         # Bounding Volume Hierarchy (axis aligned bounding boxes)
         # Use separate trees for different stone sizes (e.g. one for normal stones, one for filler stones)
-        # AABBTree is a static tree (easy to use),
-        # Todo: for simulation (placement finder), probably a dynamic tree is necessary
-        # https://github.com/lohedges/aabbcc -> c++ with python wrapper, no pythonic interface
-        self.tree: 'AABBTree' = AABBTree()
+        p = index.Property(dimension=3)
+        self.r_tree = index.Index(properties=p)
 
         if not self.stones:
             self.stones = []
-            # self.mesh = form_mesh(np.array([0, 0, 0]), np.array([]))
 
     def add_stone(self, stone: 'Stone'):
         # Add the stone to the mesh
@@ -53,7 +53,7 @@ class Wall:
         self.stones.append(stone)
         i = len(self.stones) - 1  # index of the stone
         # Add the BB to the tree, the name of the stone is the index in the stones-list
-        self.tree.add(stone.aabb, i)
+        self.r_tree.insert(i, stone.aabb_limits.flatten())
 
     def __repr__(self):
         return f'<Wall(boundary={self.boundary}, stones={self.stones})>'
@@ -64,25 +64,78 @@ class Geometry:
     Generic class for a geometrical object
     """
     name: str = None
-    mesh: 'pymesh.Mesh' = None
+    _mesh: 'pymesh.Mesh' = None
     triangles_values: np.ndarray = None  # triangle coordinates
-    aabb: 'AABB' = None  # axis aligned bounding box
-    aabb_limits: np.ndarray = None  # [[xmin, ymin, zmin], [xmax, ymax, zmax]]
+    _aabb_limits: np.ndarray = None  # np.array([[xmin, ymin, zmin], [xmax, ymax, zmax]])
+    _aabb_volume: float = None
 
     def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
         if mesh:
             self.mesh = mesh
-            self.calc_triangle_values()
-            self.calc_aabb()
 
-    def calc_triangle_values(self):
-        self.triangles_values = [[self.mesh.vertices[j] for j in t_ind] for t_ind in self.mesh.faces]
+    def _calc_triangle_values(self):
+        return [[self.mesh.vertices[j] for j in t_ind] for t_ind in self.mesh.faces]
 
-    def calc_aabb(self):
-        corners = np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)]).T
-        self.aabb = AABB(corners)
-        self.aabb_limits = np.array([np.min(self.aabb.corners, axis=0), np.max(self.aabb.corners, axis=0)])
+    def _calc_aabb_limits(self):
+        return np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)])
+
+    def _update_mesh_properties(self):
+        self.triangles_values = self._calc_triangle_values()
+        self._aabb_limits = self._calc_aabb_limits()
+
+    @property
+    def mesh(self):
+        return self._mesh
+
+    @mesh.setter
+    def mesh(self, mesh: 'pymesh.Mesh'):
+        self._mesh = mesh
+        self._update_mesh_properties()
+
+    @property
+    def aabb_limits(self):
+        if not np.any(self._aabb_limits) and self.mesh:
+            # no aabb yet but there is a mesh
+            self._aabb_limits = np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)])
+            self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+        return self._aabb_limits
+
+    @aabb_limits.setter
+    def aabb_limits(self, limits):
+        # Todo: what if there is a mesh and aabb_limits --> have to be the same
+        self._aabb_limits = limits
+        self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+
+    @property
+    def aabb_volume(self):
+        # calculated the first time accessed, no setter possible
+        if not self._aabb_volume and self._aabb_limits:
+            # no vol yet but there is a aabb])
+            self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+        return self._aabb_volume
+
+    def aabb_overlap(self, other_limits: 'np.ndarray') -> Optional['np.ndarray']:
+        """
+        calculates the overlapping region. if no overlap, it returns None
+
+        :param other_limits: np.arr
+        :return: limits
+        """
+
+        # minimum of both maxima; maximum of both minima
+        overlap_min = np.max(np.array([self.aabb_limits[0], other_limits[0]]), axis=0)
+        overlap_max = np.min(np.array([self.aabb_limits[1], other_limits[1]]), axis=0)
+
+        # difference is positive, if there is an overlap
+        diff = overlap_max - overlap_min
+
+        if np.any(diff <= 0):
+            # adjacent bb, the tree returns an overlap
+            # print('No overlap, diff:', diff)
+            return None
+
+        return np.array([overlap_min, overlap_max])
 
     def add_shape_to_ax(self, ax, color='red'):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
@@ -99,20 +152,16 @@ class Geometry:
 
 class Intersection(Geometry):
     """
-    Intersection of geometries
+    Intersection of geometries, init with a mesh or with bb_limits
     """
-    aabb_volume: float = None
     mesh_volume: float = None
 
-    def __init__(self, mesh: 'pymesh.Mesh' = None, bb: 'AABB' = None, bb_volume: float = None, name: str = None):
+    def __init__(self, mesh: 'pymesh.Mesh' = None, bb_limits: 'np.ndarray' = None, name: str = None):
         # if there is a mesh, __init__ adds the mesh, calculates triangle values and the aabb
         super().__init__(mesh, name)
 
-        if bb:
-            self.aabb = bb
-            self.aabb_volume = self.aabb.volume
-        elif bb_volume:
-            self.aabb_volume = bb_volume
+        if np.any(bb_limits):
+            self.aabb_limits = bb_limits
 
         if self.mesh and np.any(self.mesh.voxels):
             self.mesh_volume = tetra_volume(mesh.vertices.T, mesh.voxels)
@@ -124,6 +173,13 @@ class Boundary(Geometry):
     a, b, c, d: bottom 4 vertices (counterclockwise)
     e, f, g h: top 4 vertices (clockwise
     """
+    x: float = 0  # length
+    y: float = 0  # width
+    z: float = 0  # height
+    # self.mesh is only for visualizations (5 triangulated planes, no closed mesh)
+    # Solid meshes can be used for boolean operations
+    mesh_solid: 'pymesh.Mesh' = None  # with the bottom boundary
+    mesh_solid_sides: 'pymesh.Mesh' = None  # only boundaries at the sides
 
     def __init__(self, x=2., y=0.5, z=1, name='Boundary'):
         """
@@ -167,12 +223,10 @@ class Boundary(Geometry):
 
         # the mesh is only with the bounding planes (bottom and sides) for plotting
         self.mesh = pymesh.form_mesh(vertices[:8], triangles_index[:10])
-        self.calc_triangle_values()
-        # self.mesh = pymesh.form_mesh(vertices, triangles_index)
-        # the solid mesh can be used for boolean operations (intersection)
+
+        # the solid mesh can be used for boolean operations (intersection) -> not used at the moment
         self.mesh_solid = pymesh.form_mesh(vertices, triangles_index)
 
-        # self.bottom = np.array([a, b, c, d])
         # solid mesh without the bottom plane for calculating the distance to the sides
         triangles_index = np.array([
             [0, 5, 1], [0, 4, 5],  # front
@@ -191,9 +245,6 @@ class Boundary(Geometry):
         ])
         self.mesh_solid_sides = pymesh.form_mesh(vertices, triangles_index)
 
-        # Add the boundignbox and its corners
-        self.calc_aabb()
-
     def add_shape_to_ax(self, ax, color='grey'):
         """
         Adds the boundaries to the plot
@@ -206,19 +257,6 @@ class Boundary(Geometry):
         # Todo: pass kwargs for setting the Poly3DCollection attributes
         super().add_shape_to_ax(ax, color)
 
-        # # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
-        # ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
-        #           color=color, marker='.', markersize=1)
-        # # triangulation
-        # col = Poly3DCollection(self.triangles_values, linewidths=1, edgecolors=color, alpha=.1)
-        # col.set_facecolor(color)
-        # ax.add_collection3d(col)
-        # # Add the triangle normal to the plot
-        # for tri in self.triangles_values:
-        #     n = np.cross(tri[1]-tri[0], tri[2]-tri[0])
-        #     c = np.mean(tri, axis=0)
-        #     ax.plot3D([c[0], c[0]+n[0]], [c[1], c[1]+n[1]], [c[2], c[2]+n[2]], 'b')
-
     def __repr__(self):
         return f'<Boundary(vertices=array([{(self.mesh.vertices[:2])}, ...])>'
 
@@ -228,14 +266,7 @@ class Stone(Geometry):
     A stone is described as a collection of vertices (n, 3), initially aligned to the
     coordinate axis length in x-direction, width in y-direction, height in z-direction
     """
-    name: str = None
-
-    # geometry: vertices and triangles
-    # vertices: np.ndarray = None  # (n, 3)
-    # triangles_index: np.ndarray = None   # indices to the triangle points
-    triangles_values: np.ndarray = None  # triangle coordinates
-
-    # geometrical properties
+    # geometrical properties -> ideally only getter, no setter
     eigenvalue: np.ndarray = None
     eigenvector: np.ndarray = None  # (3, 3) !!! vectors as column vectors !!!
     center: np.ndarray = None
@@ -310,7 +341,6 @@ class Stone(Geometry):
                                    [1, 2, 5, 6]])  # right
 
             # initialize triangles
-            # self.triangles_values = [[] for _ in range(12)]  # 8 vertices -> 12 triangles
             triangles_index = np.array([
                 # a c  b    a  d  c]
                 [0, 2, 1], [0, 3, 2],  # bottom
@@ -339,7 +369,6 @@ class Stone(Geometry):
             # Todo: sides for arbitrary stones
 
         self.mesh = pymesh.form_mesh(vertices, triangles_index)
-        self.update_properties()
 
         # calculate the volume
         tetgen = pymesh.tetgen()
@@ -350,16 +379,18 @@ class Stone(Geometry):
         tetgen.triangles = self.mesh.faces
         tetgen.run()
         tetra = tetgen.mesh
-        # tetra = pymesh.tetrahedralize(self.mesh, 2, engine='tetgen')
+
         self.mesh_volume = tetra_volume(tetra.vertices.T, tetra.voxels)
 
-    def update_properties(self):
+    def _update_mesh_properties(self):
         """
         Get important faces and their normals.
         Simplification: a face is a plane for rectangular stones
 
         :return:
         """
+        # triangles + aabb from class Geometry
+        super()._update_mesh_properties()
 
         self.center = self.mesh.vertices.mean(axis=0)
         self.eigenvalue, self.eigenvector = self.pca()
@@ -377,12 +408,6 @@ class Stone(Geometry):
 
         if np.any(self.sides):
             self.sides_center = [self.mesh.vertices[s].mean(axis=0) for s in self.sides]
-
-        # update triangle values
-        self.calc_triangle_values()
-
-        # update the bounding box
-        self.calc_aabb()
 
     def pca(self, vertices: np.ndarray = None):
         """
@@ -409,7 +434,7 @@ class Stone(Geometry):
         # Rewrite mesh (not possible to update?)
         self.mesh = pymesh.form_mesh(v.T, self.mesh.faces)
         # self.mesh.vertices = v.T
-        self.update_properties()
+        self._update_mesh_properties()
 
     def add_shape_to_ax(self, ax, color: str = 'green'):
         """

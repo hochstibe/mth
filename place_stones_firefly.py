@@ -6,6 +6,7 @@
 from time import time
 
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 
 from trockenmauer.stone import Boundary, Wall
@@ -16,21 +17,35 @@ from trockenmauer.validation import Validator
 from trockenmauer.placement import random_init_fixed_z
 from swarmlib.firefly_problem import FireflyProblem
 
+
+STONES = 10
+
 boundary = Boundary()
 wall = Wall(boundary)
 fig = plt.figure()
 ax = Axes3D(fig, auto_add_to_figure=False)
 fig.add_axes(ax)
-boundary.add_shape_to_ax(ax)
+start = time()
 
 validator = Validator(intersection_boundary=True, intersection_stones=True,
                       distance2boundary=True,
                       volume_below_stone=True
                       )
 
-# place stones
-start = time()
-for i in range(20):
+
+def init_func():
+    boundary.add_shape_to_ax(ax)
+    # Set plot properties
+    set_axes_equal(ax)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    plt.draw()
+
+
+def func(i):
+    # Generate, optimize and plot a stone
+
     stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(i))
     # Find a placement
     problem = FireflyProblem(5, validator.fitness, boundary.aabb_limits[0], boundary.aabb_limits[1],
@@ -42,13 +57,16 @@ for i in range(20):
     stone.transform(transformation=t)
     wall.add_stone(stone)
     stone.add_shape_to_ax(ax)
+    plt.draw()
 
-stop = time()
-m, s = divmod(stop-start, 60)
-print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
+    # Stop criteria
+    if i == STONES - 1:
+        stop = time()
+        m, s = divmod(stop-start, 60)
+        print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
 
-set_axes_equal(ax)
-ax.set_xlabel('x')
-ax.set_ylabel('y')
-ax.set_zlabel('z')
+
+# Run the animation
+ani = FuncAnimation(fig, func, frames=STONES, interval=1, repeat=False, init_func=init_func)
+
 plt.show()

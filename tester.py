@@ -17,56 +17,45 @@ from trockenmauer.math_utils import Translation, tetra_volume
 from trockenmauer.plot import set_axes_equal
 
 # footprint of bounding box
-s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
-print(s1.aabb, s1.aabb[2, 1])
-print(np.vstack((s1.aabb_limits.T[:2, :], [0, 123])))
-print(np.vstack((s1.aabb[:2, :], [0, 456])))
-bb = AABB(np.vstack((s1.aabb_limits.T[:2, :], [0, 10])))
-print(bb)
-print(bb[:, 1] - bb[:, 0])
-c = bb[:, 1] - bb[:, 0]
-print(c[0] * c[1] * c[2])
-print(bb.volume)
-
-
-# Footprint of mesh
 # s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
-#
-# vertices = copy(s1.mesh.vertices)
-# print(vertices.shape)
-# vertices[:, 2] = 0
-# print(vertices.shape)
-# # print(vertices)
-#
-# # convex hull of 2d problem
-# mesh = pymesh.form_mesh(s1.mesh.vertices[:, :2], s1.mesh.faces)
-# mesh_2, info = pymesh.remove_duplicated_vertices(mesh, tol=1e-3)
-# tri = pymesh.triangle()
-# tri.points = mesh_2.vertices
-# tri.verbosity = 2
-# tri.run()
-# print('2d convex hull', len(tri.mesh.vertices), len(tri.mesh.faces))
-# # convex hull of 3d problem
-# bottom_vertices = np.vstack(mesh_2.vertices.T, np.zeros(3)).T
-# print(s1.top_center[2] * np.ones(3))
-# top_vertices = np.vstack(mesh_2.vertices.T, s1.top_center[2] * np.ones(3))
-# vertices = np.vstack(bottom_vertices, top_vertices)
-#
-#
-#
-# # Try to get the outer hull --> triangles are doubled (one normal up, one down)
-# # tri = pymesh.form_mesh(vertices, s1.mesh.faces)
-# # print(len(tri.vertices), len(tri.faces))
-# # tri = pymesh.compute_outer_hull(tri)
-# # print('hull', len(tri.vertices), len(tri.faces))
-# #
-# # tri, info = pymesh.remove_duplicated_vertices(tri, tol=1e-3)
-# # print(len(tri.vertices), len(tri.faces), info)
-# # tri, info = pymesh.remove_degenerated_triangles(tri, 2)
-# # print(len(tri.vertices), len(tri.faces), info)
-# # print(tri.faces)
-# # tri, info = pymesh.remove_duplicated_faces(tri) --> removes all faces
-# # print(len(tri.vertices), len(tri.faces), info)
+
+class Test:
+    _a = None
+    _hidden = 'not settable'
+
+    @property
+    def hidden(self):
+        return self._hidden
+
+    @property
+    def a(self):
+        if not np.any(self._a):
+            self._a = np.array([1, 2])
+        return self._a
+
+    @a.setter
+    def a(self, arr):
+        self._a = arr
+
+    def b(self):
+        print('Test')
+
+class Tester(Test):
+    def __init__(self):
+        super().__init__()
+    def b(self):
+        super().b()
+        print('Tester')
+
+t = Test()
+if np.any(t.a):
+    print('setter worked')
+print(t.a[0])
+tt = Tester()
+tt.b()
+print(t.hidden)
+t.hidden = 'set hidden attr'
+
 """
 tri = pymesh.triangle()
 tri.points = vertices[:, :2]
