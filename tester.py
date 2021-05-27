@@ -19,28 +19,51 @@ from trockenmauer.plot import set_axes_equal
 # footprint of bounding box
 # s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
 
-stones = [['s1', 's1'], ['s2', 's2', 's2'], ['s3', 's3', 's3', 's3']]
-frames = len(stones) + sum([len(stone) for stone in stones])
-print(frames, 'frames')
+# Rotation matrix from v1 to v2
+v_1 = np.array([[1], [0], [0]])
+v_2 = np.array([[0], [1], [0]])
 
-# lookup dictionary for the stones
-lookup = {}
-frame = 0
-for i in range(len(stones)):
-    lookup[i] = range(frame, frame + 1 + len(stones[i]))
-    frame += len(stones[i]) + 1
-print(lookup)
 
-for frame in range(frames):
-    # find the stone
-    stone_index = [i for i in lookup if frame in lookup[i]][0]
+def rotation_align_vectors(v1, v2):
+    """
+    Calculates the rotation matrix from vector v1 vector to vector v2
+    :param v1:
+    :param v2:
+    :return:
+    """
 
-    history_index = frame - lookup[stone_index].start
-    # print('frame', frame, 'stone', stone_index, history_index, lookup[stone_index])
-    if history_index in range(len(stones[stone_index])):
-        print('frame', frame, 'stone', stone_index, 'history', history_index)
-    else:
-        print('frame', frame, 'stone', stone_index, 'plot stone')
+    # normalize the length of the vectors
+    v1 = (v1 / np.linalg.norm(v1)).flatten()
+    v2 = (v2 / np.linalg.norm(v2)).flatten()
+
+    if np.all(v1 == v2):
+        return np.eye(3)
+    elif np.all(-v1 == v2):
+        return np.diag([-1, -1, -1])
+
+    # cross product of the normalized vectors
+    cross_p = np.cross(v1, v2)
+
+    # rotation axis: normalized cross product
+    u = cross_p / np.linalg.norm(cross_p)
+
+    # the angle between vectors is the length of the cross product or the dot
+    sin_phi = np.linalg.norm(np.linalg.norm(cross_p))
+    cos_phi = np.dot(v1, v2)
+
+    cross_p_matrix = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])
+
+    r = cos_phi * np.eye(3) + sin_phi * cross_p_matrix + (1-cos_phi) * np.outer(u, u)
+
+    return r
+rot = rotation_align_vectors(v_1, v_2)
+print('rot')
+print(rot)
+print('aligned vec')
+print(rot @ v_1)
+print(np.linalg.norm(rot @ v_1))
+
+
 
 """
 tri = pymesh.triangle()

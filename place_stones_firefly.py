@@ -9,15 +9,15 @@ from datetime import datetime
 from trockenmauer.stone import Boundary
 from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
-from trockenmauer.math_utils import Translation
+from trockenmauer.math_utils import Translation, Rotation, RZ_90
 from trockenmauer.validation import Validator
 from trockenmauer.placement import random_init_fixed_z
 from swarmlib.firefly_problem import FireflyProblem
 
 
-STONES = 10
-FIREFLIES = 10
-ITERATIONS = 30
+STONES = 3
+FIREFLIES = 2
+ITERATIONS = 2
 
 filename = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
@@ -28,6 +28,19 @@ validator = Validator(intersection_boundary=True, intersection_stones=True,
                       distance2boundary=True, volume_below_stone=True,
                       distance2closest_stone=True
                       )
+
+# 90° Rotation around z-axis
+rz_90 = Rotation(RZ_90)
+
+# Place the first stone manually
+stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(-1))
+stone.transform(rz_90)
+# translate the center to the wall
+t = Translation(stone.aabb_limits / 2)
+stone.transform(t)
+wall.add_stone()
+
+
 
 start = time()
 for i in range(STONES):

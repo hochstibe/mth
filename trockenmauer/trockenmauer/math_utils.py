@@ -6,6 +6,9 @@
 from typing import List, Union, Tuple
 import numpy as np
 
+# 90° Rotation around z axis
+RZ_90 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
+
 
 class Transformation:
     """
@@ -309,6 +312,43 @@ def rot_matrix(e_vec: np.ndarray, order: Union[List, np.ndarray] = (0, 1, 2),
         x = e_vec_t
     return x
 
+
+def rotation_align_vectors(v1: np.ndarray, v2: np.ndarray):
+    """
+    Calculates the rotation matrix from vector v1 vector to vector v2.
+
+    :param v1: (3,1) or (1,3) array
+    :param v2: (3,1) or (1,3) array
+    :return: Rotation matrix
+    """
+
+    # normalize the length of the vectors
+    v1 = (v1 / np.linalg.norm(v1)).flatten()
+    v2 = (v2 / np.linalg.norm(v2)).flatten()
+
+    if np.all(v1 == v2):
+        return np.eye(3)
+    elif np.all(-v1 == v2):
+        return np.diag([-1, -1, -1])
+
+    # cross product of the normalized vectors
+    cross_p = np.cross(v1, v2)
+
+    # rotation axis: normalized cross product
+    u = cross_p / np.linalg.norm(cross_p)
+
+    # the angle between vectors is the length of the cross product or the dot
+    # https://en.wikipedia.org/wiki/Cross_product
+    # https://en.wikipedia.org/wiki/Dot_product
+    sin_phi = np.linalg.norm(np.linalg.norm(cross_p))
+    cos_phi = np.dot(v1, v2)
+
+    # https://en.wikipedia.org/wiki/Rotation_matrix
+    cross_p_matrix = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])
+
+    r = cos_phi * np.eye(3) + sin_phi * cross_p_matrix + (1-cos_phi) * np.outer(u, u)
+
+    return r
 
 def tetra_volume(vertices, voxels):
     """
