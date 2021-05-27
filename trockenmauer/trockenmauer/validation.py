@@ -13,7 +13,8 @@ from .stone import Intersection
 from .math_utils import Translation
 
 if TYPE_CHECKING:
-    from .stone import Stone, Boundary, Wall
+    from .stone import Stone, Boundary
+    from trockenmauer.wall import Wall
 
 
 class Validator:
@@ -35,7 +36,7 @@ class Validator:
     """
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
-                 distance2boundary=False, volume_below_stone=False):
+                 distance2boundary=False, volume_below_stone=False, distance2closest_stone=False):
         """
         The parameters control, witch validations will be executed
 
@@ -46,6 +47,7 @@ class Validator:
         self.intersection_stones = intersection_stones
         self.distance2boundary = distance2boundary
         self.volume_below_stone = volume_below_stone
+        self.distance2closest_stone = distance2closest_stone
 
         # initialize tetgen for tetrahedralization
         self.tetgen = pymesh.tetgen()
@@ -145,8 +147,26 @@ class Validator:
 
         return bb_vol - vol_inter
 
-    def _closest_stone(self, stone:'Stone', wall: 'Wall'):
-        pass
+    @staticmethod
+    def _closest_stone(stone: 'Stone', wall: 'Wall'):
+
+        hits = wall.r_tree.nearest(stone.aabb_limits.flatten(), num_results=5, objects=True)
+
+        shortest_distances = list()
+        for h in hits:
+            # upper corner of the hit has to be higher than the stones lower corner
+            if h.bbox[-1] > stone.aabb_limits[0, 2]:  # only use stones on the same level or higher
+                overlap_min = np.max(np.array([stone.aabb_limits[0], h.bbox[:3]]), axis=0)
+                overlap_max = np.min(np.array([stone.aabb_limits[1], h.bbox[3:]]), axis=0)
+                diff = overlap_max - overlap_min
+                d = np.linalg.norm(diff[diff <= 0])
+                # negative --> in this direction is the shortest distance
+                shortest_distances.append(d)
+
+        if shortest_distances:
+            return shortest_distances[0]
+        else:
+            return 0.
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
@@ -182,6 +202,9 @@ class Validator:
             v = self._volume_below_stone(stone, wall)
             results.volume_below_stone = v
 
+        if self.distance2closest_stone:
+            results.distance2closest_stone = self._closest_stone(stone, wall)
+
         return passed, results
 
     def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs):
@@ -204,14 +227,18 @@ class Validator:
         # - volume below the stone
         score = 0
         # intersection volume
-        if res.intersection:
-            score += 1 + 10 * res.intersection_volume / stone.mesh_volume
+        if res.intersection:  # penalty any intersection with 1 and add 10* scaled volume
+            score += 2 + 10 * res.intersection_volume / stone.mesh_volume
         # Distance to boundary
         if self.distance2boundary:
             score += 5*res.distance2boundary
         # free volume below the stone
         if self.volume_below_stone:
             score += res.volume_below_stone / stone.mesh_volume
+        # distance to the closest stone on the same level
+        if self.distance2closest_stone:
+            # no penalty, if there is no stone on the same level
+            score += 5 * res.distance2closest_stone
         return score
 
 
@@ -227,6 +254,7 @@ class ValidationResult:
     _intersection_volume: float = 0  # total intersection volume
     distance2boundary: float = 0  # minimal distance to the boundary
     volume_below_stone: float = 0  # total free volume below the stone
+    distance2closest_stone: float = 0
 
     @property
     def intersection_boundary(self) -> 'Intersection':

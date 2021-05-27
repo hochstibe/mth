@@ -10,12 +10,13 @@ import numpy as np
 
 
 if TYPE_CHECKING:
-    from .stone import Wall
+    from trockenmauer.wall import Wall
 
 
 def random_init_fixed_z(xyz: np.ndarray, wall: 'Wall', **kwargs):
     """
-    Calculates an initial z value for a given position
+    Calculates an initial z value for a given position: On the ground area or
+    on top of the bounding box of a stone
 
     :param xyz: Random coordinates within the range [lower_boundary .. upper boundary]
     :param wall:
@@ -25,13 +26,12 @@ def random_init_fixed_z(xyz: np.ndarray, wall: 'Wall', **kwargs):
     z = .0001
 
     for stone in wall.stones:
-        minimum = stone.mesh.vertices[stone.top].min(axis=0)
-        maximum = stone.mesh.vertices[stone.top].max(axis=0)
+        minimum, maximum = stone.aabb_limits
 
         if minimum[0] < x < maximum[0] and minimum[1] < y < maximum[1]:
             # placement is on a stone
             # print('on a stone, maybe top stone')
-            z_temp = stone.top_center[2] + 0.001
+            z_temp = maximum[2] + 0.0001
             if z_temp > z:
                 # print('on top of a stone', z, z_temp)
                 z = z_temp  # update z

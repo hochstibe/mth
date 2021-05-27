@@ -19,42 +19,28 @@ from trockenmauer.plot import set_axes_equal
 # footprint of bounding box
 # s1 = generate_regular_stone(.4, 0.2, 0.1, edge_noise=0.5, scale=[1, 2])
 
-class Test:
-    _a = None
-    _hidden = 'not settable'
+stones = [['s1', 's1'], ['s2', 's2', 's2'], ['s3', 's3', 's3', 's3']]
+frames = len(stones) + sum([len(stone) for stone in stones])
+print(frames, 'frames')
 
-    @property
-    def hidden(self):
-        return self._hidden
+# lookup dictionary for the stones
+lookup = {}
+frame = 0
+for i in range(len(stones)):
+    lookup[i] = range(frame, frame + 1 + len(stones[i]))
+    frame += len(stones[i]) + 1
+print(lookup)
 
-    @property
-    def a(self):
-        if not np.any(self._a):
-            self._a = np.array([1, 2])
-        return self._a
+for frame in range(frames):
+    # find the stone
+    stone_index = [i for i in lookup if frame in lookup[i]][0]
 
-    @a.setter
-    def a(self, arr):
-        self._a = arr
-
-    def b(self):
-        print('Test')
-
-class Tester(Test):
-    def __init__(self):
-        super().__init__()
-    def b(self):
-        super().b()
-        print('Tester')
-
-t = Test()
-if np.any(t.a):
-    print('setter worked')
-print(t.a[0])
-tt = Tester()
-tt.b()
-print(t.hidden)
-t.hidden = 'set hidden attr'
+    history_index = frame - lookup[stone_index].start
+    # print('frame', frame, 'stone', stone_index, history_index, lookup[stone_index])
+    if history_index in range(len(stones[stone_index])):
+        print('frame', frame, 'stone', stone_index, 'history', history_index)
+    else:
+        print('frame', frame, 'stone', stone_index, 'plot stone')
 
 """
 tri = pymesh.triangle()

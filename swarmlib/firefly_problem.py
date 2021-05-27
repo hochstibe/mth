@@ -5,8 +5,10 @@
 
 from copy import copy  # deepcopy
 import logging
+from dataclasses import dataclass
+from typing import List, Tuple
 
-from numpy.random import default_rng
+import numpy as np
 
 from swarmlib.firefly import Firefly
 
@@ -15,7 +17,7 @@ LOGGER = logging.getLogger(__name__)
 
 class FireflyProblem:
     def __init__(self, firefly_number, function, lower_boundary=0, upper_boundary=1, alpha=0.25, beta=1, gamma=0.97,
-                 iteration_number=100, seed=None, init_function=None, **kwargs):
+                 iteration_number=100, seed=None, init_function=None, random_walk_area=.1, **kwargs):
         """Initializes a new instance of the `FireflyProblem` class.
 
         Keyword arguments:  \r
@@ -31,8 +33,9 @@ class FireflyProblem:
         `continuous`       -- Indicates whether the algorithm should run continuously (default False)
         """
 
-        self._random = default_rng(seed)
+        self._random = np.random.default_rng(seed)
         self.__iteration_number = iteration_number
+        self._random_walk_area = random_walk_area
         # Create fireflies
         self.__fireflies = [
             Firefly(alpha, beta, gamma, lower_boundary, upper_boundary, function,
@@ -44,26 +47,58 @@ class FireflyProblem:
         # self._visualizer = BaseVisualizer(**kwargs)
         # self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
 
-    def solve(self) -> Firefly:
+    def solve(self) -> Tuple[Firefly, List['Iteration']]:
         """Solve the problem."""
-        best = None
-        for _ in range(self.__iteration_number):
+        best = None  # best firefly
+        history = list()  # history of firefly positions
+
+        # keep track of iterations and updates
+        no_update = 0
+        iteration = 0
+
+        while no_update < 10 and iteration < self.__iteration_number:
+        # for _ in range(self.__iteration_number):
             for i in self.__fireflies:
                 for j in self.__fireflies:
                     if j < i:
                         i.move_towards(j.position)
+            iteration += 1
 
             current_best = min(self.__fireflies)
             if not best or current_best < best:
+                # update the best solution
                 # best = deepcopy(current_best)
                 best = copy(current_best)
+                no_update = 0
+
+            else:
+                # no update of the best solution
+                no_update += 1
 
             LOGGER.info('Current best value: %s, Overall best value: %s', current_best.value, best.value)
 
             # randomly walk the best firefly
-            current_best.random_walk(0.1)
+            current_best.random_walk(self._random_walk_area)
 
             # Add data for visualization
+            history.append(Iteration(np.array([firefly.position for firefly in self.__fireflies]),
+                                     np.array([firefly.value for firefly in self.__fireflies])))
             # self._visualizer.add_data(positions=[firefly.position for firefly in self.__fireflies])
+        print(iteration, 'iterations, no update for', no_update)
+        return best, history
 
-        return best
+
+@dataclass
+class Iteration:
+    positions: 'np.ndarray'
+    values: 'np.ndarray'
+    velocities: 'np.ndarray' = None
+
+    # @property
+    # def velocities(self):
+    #     if not self._velocities:
+    #         vel = [self.positions[i + 1] - self.positions[i] for i in range(len(self.positions) - 1)]
+    #         vel.insert(0, np.zeros(3))
+    #         self._velocities = vel
+#
+    #     return self._velocities

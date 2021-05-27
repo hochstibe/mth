@@ -39,7 +39,7 @@ class Firefly:
             self.__alpha*(self._random.uniform(0, 1)-0.5)
 
     def random_walk(self, area):
-        self._position = np.array([self._random.uniform(cord-area, cord+area) for cord in self._position])
+        self._position = self._random.uniform(self._position-area, self._position+area, 3)
 
     def _initialize(self) -> None:
         """

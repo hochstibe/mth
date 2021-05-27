@@ -40,4 +40,5 @@ def set_axes_equal(ax: 'Axes'):
 
     ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
-    ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+    # ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+    ax.set_zlim3d([0, 2 * plot_radius])

@@ -4,59 +4,19 @@
 #
 
 import random
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import pymesh
-from rtree import index
 
 from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Transformation, tetra_volume
 
+if TYPE_CHECKING:
+    from swarmlib.firefly_problem import Iteration
+
 
 NAMES = ['Achondrit', 'Adakit', 'Aleurit', 'Alkaligranit', 'Alnöit', 'Alvikit', 'Amphibolit', 'Anatexit', 'Andesit', 'Anhydrit', 'Anorthosit', 'Anthrazit', 'Aplit', 'Arenit', 'Arkose', 'Augengneis', 'Basalt', 'Basanit', 'Bauxit', 'Beforsit', 'Bentonit', 'Bergalith', 'Bimsstein', 'Biolithe', 'Blätterkohle', 'Blauschiefer', 'Bohnerz', 'Braunkohle', 'Brekzie', 'Buntsandstein', 'Bändererz', 'Buchit', 'Cancalit', 'Charnockit', 'Chert', 'Chloritschiefer', 'Chondrit', 'Cipollino', 'Dachschiefer', 'Dacit', 'Diabas', 'Diamiktit', 'Diatomit', 'Diorit', 'Dolerit', 'Dolomit', 'Dunit', 'Ehrwaldit', 'Eisenmeteorit', 'Eisenoolith', 'Eklogit', 'Enderbit', 'Erbsenstein', 'Essexit', 'Evaporit', 'Fanglomerat', 'Faserkohle', 'Felsit', 'Fenit', 'Fettkohle', 'Feuerstein', 'Fladenlava', 'Flammkohle', 'Fleckschiefer', 'Flint', 'Flysch', 'Foidit', 'Fortunit', 'Foyait', 'Fruchtschiefer', 'Fulgurit', 'Gabbro', 'Garbenschiefer', 'Gauteit', 'Gasflammkohle', 'Gaskohle', 'Gips', 'Glanz(braun)kohle', 'Glaukophanschiefer', 'Glimmerschiefer', 'Gneis', 'Granit', 'Granitporphyr', 'Granodiorit', 'Granophyr', 'Granulit', 'Graptolithenschiefer', 'Grauwacke', 'Griffelschiefer', 'Grünschiefer', 'Hälleflinta', 'Halitit', 'Hartbraunkohle', 'Harzburgit', 'Hawaiit', 'Hornblendit', 'Hornfels', 'Hornstein', 'Ignimbrit', 'Impaktit', 'Itakolumit', 'Jacupirangit', 'Jumillit', 'Kakirit', 'Kalisalze', 'Kalksandstein', 'Kalkstein', 'Kalksilikatfels', 'Kalksinter', 'Kalktuff', 'Kalziolith', 'Kännelkohle', 'Kaolin', 'Karbonatit', 'Karstmarmore', 'Kataklasit', 'Kennelkohle', 'Keratophyr', 'Kersantit', 'Khondalit', 'Kieselerde', 'Kieselgur', 'Kieselschiefer', 'Kieselsinter', 'Kimberlit', 'Kissenlava', 'Klingstein', 'Knochenbrekzie', 'Knotenschiefer', 'Kohle', 'Kohleeisenstein', 'Kohlenkalk', 'Kokardenerz', 'Konglomerat', 'Kontaktschiefer', 'Korallenerz', 'Kreide', 'Kuckersit', 'Lamproit', 'Lamprophyr', 'Lapilli', 'Lapislazuli', 'Larvikit', 'Lava', 'Latit', 'Lehm', 'Leptynit', 'Letten', 'Leucitit', 'Lherzolith', 'Lignit', 'Limburgit', 'Listwänit', 'Liparit', 'Liptobiolith', 'Lockergestein', 'Löss', 'Lutit', 'Lydit', 'Madupit', 'Magerkohle', 'Mafitit', 'Mandelstein', 'Manganknollen', 'Marmor', 'Massenkalk', 'Mattkohle', 'Meimechit', 'Melaphyr', 'Melilithit', 'Mergel', 'Mergelschiefer', 'Mergelstein', 'Meteorit', 'Migmatit', 'Mikrogabbro', 'Mikrogranit', 'Minette (Ganggestein)', 'Minette (Erz)', 'Moldavit', 'Monchiquit', 'Monzonit', 'MORB', 'Mugearit', 'Mylonit', 'Nephelinbasalt', 'Nephelinit', 'Nephelinsyenit', 'Norit', 'Obsidian', 'OIB', 'Ölschiefer', 'Oolith', 'Ophicalcit', 'Ophiolith', 'Ophit', 'Orendit', 'Pallasit', 'Pechstein', 'Pantellerit', 'Pegmatit', 'Perlit', 'Peridotit', 'Phonolith', 'Phyllit', 'Pikrit', 'Pläner', 'Polzenit', 'Porphyr', 'Porphyrit', 'Prasinit', 'Pseudotachylit', 'Pyroxenit', 'Quarzit', 'Quarzolith', 'Quarzporphyr', 'Radiolarit', 'Rapakiwi', 'Raseneisenstein', 'Rauhaugit', 'Rhyolith', 'Rodingit', 'Rogenstein', 'Sagvandit', 'Sannait', 'Sandstein', 'Schalstein', 'Schiefer', 'Schwarzpelit', 'Serpentinit', 'Shonkinit', 'Silikat-Perowskit', 'Siltstein', 'Skarn', 'Sonnenbrennerbasalt', 'Sövit', 'Spessartit', 'Spiculit', 'Spilit', 'Steinkohle', 'Steinsalz', 'Steinmeteorit', 'Suevit', 'Syenit', 'Talk-Disthen-Schiefer', 'Tektit', 'Tephrit', 'Teschenit', 'Tachylit', 'Theralith', 'Tholeiit', 'Tonalit', 'Tonschiefer', 'Tonstein', 'Trachyt', 'Travertin', 'Troktolith', 'Trondhjemit', 'Tropfstein', 'Tuffstein', 'Unakit', 'Verit', 'Weißschiefer', 'Websterit', 'Wyomingit']  # noqa
-
-
-class Wall:
-    """
-    A wall consists of the placed stones and the boundary.
-    """
-    boundary: 'Boundary' = None
-    stones: List['Stone'] = []
-    mesh: 'pymesh.Mesh' = None
-
-    def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'pymesh.Mesh' = None):
-        self.boundary = boundary
-        self.stones = stones
-        self.mesh = mesh
-
-        # Bounding Volume Hierarchy (axis aligned bounding boxes)
-        # Use separate trees for different stone sizes (e.g. one for normal stones, one for filler stones)
-        p = index.Property(dimension=3)
-        self.r_tree = index.Index(properties=p)
-
-        if not self.stones:
-            self.stones = []
-
-    def add_stone(self, stone: 'Stone'):
-        # Add the stone to the mesh
-        if not self.mesh:
-            self.mesh = stone.mesh
-        else:
-            # Merging the mesh
-            self.mesh = pymesh.merge_meshes([self.mesh, stone.mesh])
-            # self.mesh = pymesh.boolean(self.mesh, stone.mesh, 'union', engine='cgal')  # alternative to merge
-            # Todo: Merging separate meshes adds a connection. It would work, if all stones are adjacent
-            # -> for the moment, to check intersections, all individual stones have to be checked
-
-        # Add the stone to the list to keep track of the individual stones
-        self.stones.append(stone)
-        i = len(self.stones) - 1  # index of the stone
-        # Add the BB to the tree, the name of the stone is the index in the stones-list
-        self.r_tree.insert(i, stone.aabb_limits.flatten())
-
-    def __repr__(self):
-        return f'<Wall(boundary={self.boundary}, stones={self.stones})>'
 
 
 class Geometry:
@@ -284,6 +244,9 @@ class Stone(Geometry):
     sides_center: List[np.ndarray] = None  # center point (mean) of each side
     # sides_n: List[np.ndarray] = None
 
+    # History of the firefly positions
+    position_history: List['Iteration'] = None
+
     def __init__(self, vertices: np.ndarray,
                  triangles_index: np.ndarray = None, name: str = None):
         """
@@ -444,14 +407,15 @@ class Stone(Geometry):
         :param color: color for the plot, e.g. 'g', 'r', 'green'
         :return: -
         """
+        super().add_shape_to_ax(ax, color)
 
         # Plot the points
-        ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
-                  color=color, marker='.', markersize=1)
-        # Plot the triangles
-        col = Poly3DCollection(self.triangles_values, linewidths=0.4, edgecolors=color, alpha=.2)
-        col.set_facecolor(color)
-        ax.add_collection3d(col)
+        # ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
+        #           color=color, marker='.', markersize=1)
+        # # Plot the triangles
+        # col = Poly3DCollection(self.triangles_values, linewidths=0.4, edgecolors=color, alpha=.2)
+        # col.set_facecolor(color)
+        # ax.add_collection3d(col)
 
         # set_axes_equal(ax)
 
