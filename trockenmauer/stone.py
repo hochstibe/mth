@@ -136,12 +136,13 @@ class Boundary(Geometry):
     x: float = 0  # length
     y: float = 0  # width
     z: float = 0  # height
+    batter: float = 0  # 'Anzug' fraction of the height, the taler, the narrower
     # self.mesh is only for visualizations (5 triangulated planes, no closed mesh)
     # Solid meshes can be used for boolean operations
     mesh_solid: 'pymesh.Mesh' = None  # with the bottom boundary
     mesh_solid_sides: 'pymesh.Mesh' = None  # only boundaries at the sides
 
-    def __init__(self, x=2., y=0.5, z=1, name='Boundary'):
+    def __init__(self, x=2., y=0.5, z=1, batter=0, name='Boundary'):
         """
 
         :param x: Length [m]
@@ -153,11 +154,13 @@ class Boundary(Geometry):
         self.y = y
         self.z = z
 
+        ba = self.batter * self.z
+
         # bounding vertices
         # lower
-        a, b, c, d = [0, 0, 0], [x, 0, 0], [x, y, 0], [0, y, 0]
+        a, b, c, d = [0, ba, 0], [x, ba, 0], [x, y-ba, 0], [0, y-ba, 0]
         # upper
-        e, f, g, h = [0, 0, z], [x, 0, z], [x, y, z], [0, y, z]
+        e, f, g, h = [0, ba, z], [x, ba, z], [x, y-ba, z], [0, y-ba, z]
         # vertices for creating a solid
         i, j, k, l = [-1, -1, -1], [x+1, -1, -1], [x+1, y+1, -1], [-1, y+1, -1]
         m, n, o, p = [-1, -1, z], [x+1, -1, z], [x+1, y+1, z], [-1, y+1, z]
@@ -245,7 +248,7 @@ class Stone(Geometry):
     # sides_n: List[np.ndarray] = None
 
     # History of the firefly positions
-    position_history: List['Iteration'] = None
+    position_history: List['Iteration'] = ()
 
     def __init__(self, vertices: np.ndarray,
                  triangles_index: np.ndarray = None, name: str = None):
@@ -392,12 +395,13 @@ class Stone(Geometry):
         :param transformation: Transformation object including the transformation matrix
         :return: Updates the vertices and all properties
         """
-
+        # c_1 = self.bottom_center
         v = transformation.transform(self.mesh.vertices.T)
         # Rewrite mesh (not possible to update?)
         self.mesh = pymesh.form_mesh(v.T, self.mesh.faces)
         # self.mesh.vertices = v.T
         self._update_mesh_properties()
+        # print(self.name, 'from',  np.round(c_1, 5), 'to', np.round(self.bottom_center, 5))
 
     def add_shape_to_ax(self, ax, color: str = 'green'):
         """

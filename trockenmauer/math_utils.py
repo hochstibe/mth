@@ -29,14 +29,10 @@ class Transformation:
         """
         self.n_dim = n_dim
 
-    def build_hom_transf_matrix(self):
+    def _build_hom_transf_matrix(self):
         """
         Dummy function to build the homogenous transformation matrix
-
-        :return:
         """
-
-        """Dummy function, replaced in child classes"""
         self.hom_transf_matrix = create_hom_trans_mat(n_dim=self.n_dim)
 
     def transform(self, points: np.ndarray):
@@ -61,17 +57,17 @@ class Translation(Transformation):
         :param n_dim: Number of dimensions
         """
         super().__init__(n_dim)
-        self.translation = translation
+        self._translation = translation
 
-        self.build_hom_transf_matrix()
+        self._build_hom_transf_matrix()
 
-    def build_hom_transf_matrix(self):
+    def _build_hom_transf_matrix(self):
         """
         Build the homogenous transformation matrix for the translation
 
         :return: Store the matrix as an attribute
         """
-        self.hom_transf_matrix = create_hom_trans_mat(t=self.translation, n_dim=self.n_dim)
+        self.hom_transf_matrix = create_hom_trans_mat(t=self._translation, n_dim=self.n_dim)
 
 
 class Rotation(Transformation):
@@ -85,12 +81,12 @@ class Rotation(Transformation):
         :param n_dim: Number of dimensions
         """
         super().__init__(n_dim)
-        self.rotation = rotation
-        self.center = center
+        self._rotation = rotation
+        self._center = center
 
-        self.build_hom_transf_matrix()
+        self._build_hom_transf_matrix()
 
-    def build_hom_transf_matrix(self):
+    def _build_hom_transf_matrix(self):
         """
         Build the homogenous transformation matrix for the rotation
         (translation to the center, rotation, translate back).
@@ -98,11 +94,11 @@ class Rotation(Transformation):
         :return: Store the matrix as an attribute
         """
         # translate center to [0, 0, 0]
-        translation1 = create_hom_trans_mat(t=-self.center, n_dim=self.n_dim)
+        translation1 = create_hom_trans_mat(t=-self._center, n_dim=self.n_dim)
         # rotate around the center
-        rotation = create_hom_trans_mat(r=self.rotation, n_dim=self.n_dim)
+        rotation = create_hom_trans_mat(r=self._rotation, n_dim=self.n_dim)
         # translate back
-        translation2 = create_hom_trans_mat(t=self.center, n_dim=self.n_dim)
+        translation2 = create_hom_trans_mat(t=self._center, n_dim=self.n_dim)
 
         self.hom_transf_matrix = translation2 @ rotation @ translation1
 
@@ -123,18 +119,18 @@ class RotationTranslation(Transformation):
         """
         super().__init__(n_dim)
         # Rotation
-        self.rotation = Rotation(rotation=rotation, center=center, n_dim=self.n_dim)
-        self.translation = Translation(translation=translation, n_dim=self.n_dim)
+        self._rotation = Rotation(rotation=rotation, center=center, n_dim=self.n_dim)
+        self._translation = Translation(translation=translation, n_dim=self.n_dim)
 
-        self.build_hom_transf_matrix()
+        self._build_hom_transf_matrix()
 
-    def build_hom_transf_matrix(self):
+    def _build_hom_transf_matrix(self):
         """
         Build the homogenous transformation matrix for the rotation and the following translation
         (translation to the center, rotation, translate back, translation).
         :return:
         """
-        self.hom_transf_matrix = self.translation.hom_transf_matrix @ self.rotation.hom_transf_matrix
+        self.hom_transf_matrix = self._translation.hom_transf_matrix @ self._rotation.hom_transf_matrix
 
 
 def transform(points, transf_matrix: np.eye(4), n_dim=3, homogenous=True, **kwargs) -> np.ndarray:

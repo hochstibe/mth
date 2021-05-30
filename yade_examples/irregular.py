@@ -19,6 +19,7 @@ from __future__ import print_function
 # create box with free top, and ceate loose packing inside the box
 from yade import plot, polyhedra_utils
 from yade import qt
+from trockenmauer.generate_stones import generate_regular_stone
 
 m = PolyhedraMat()
 m.density = 2600  # kg/m^3
@@ -28,7 +29,9 @@ m.frictionAngle = 0.6  # rad
 
 O.bodies.append(utils.wall(0, axis=2, sense=1, material=m))
 
-t = polyhedra_utils.polyhedra(m, size=(0.06, 0.06, 0.06), seed=5)
+# t = polyhedra_utils.polyhedra(m, size=(0.06, 0.06, 0.06), seed=5)
+stone = generate_regular_stone(0.2, 0.1, 0.1)
+t = polyhedra_utils.polyhedra(m, v=stone.mesh.vertices, )
 t.state.pos = (0., 0., 0.5)
 O.bodies.append(t)
 

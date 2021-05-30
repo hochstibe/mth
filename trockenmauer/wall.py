@@ -2,8 +2,9 @@
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 27.05.21, wall.py
 #
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 from pathlib import Path
+import time
 
 import pymesh
 from rtree import index
@@ -42,7 +43,7 @@ class Wall:
         # private attributes for the replay
         self._fig = None
         self._ax = None
-        self._stone_frames = None  # lookup to find the stone based on the frame
+        self._stone_frames = None  # lookup to find the stone based on the frame index
 
     def add_stone(self, stone: 'Stone'):
         # Add the stone to the mesh
@@ -87,6 +88,9 @@ class Wall:
         * final position
 
         """
+        # hold still at the first frame
+        if frame == 0:
+            time.sleep(2)
         # Find the stone for the current frame
         stone_index = [i for i in self._stone_frames if frame in self._stone_frames[i]][0]
         stone = self.stones[stone_index]
@@ -108,21 +112,14 @@ class Wall:
 
             self._ax.scatter(pos[:, 0], pos[:, 1], pos[:, 2], c='red', marker='.', s=20)
             self._ax.quiver(pos[:, 0], pos[:, 1], pos[:, 2], vel[:, 0], vel[:, 1], vel[:, 2],
-                            arrow_length_ratio=.1, linewidths=1,
+                            arrow_length_ratio=.1, linewidths=.5,
                             color='red')
 
         else:
-            # plot the stone
+            # after the fireflies, the final position of the stone is plotted
             stone.add_shape_to_ax(self._ax)
 
-        # vel = [hist[i + 1].positions - hist[i].positions for i in range(len(hist) - 1)]
-        # vel.insert(0, np.zeros((len(hist[0].positions), 3)))  # zero velocity at first iteration
-        # print('stone', i, 'len history', len(self.stones[i].position_history))
-        # print('velocities')
-        # print(vel)
-        # self.stones[i].add_shape_to_ax(self._ax)
-
-    def replay(self, fireflies: bool = False, save: str = False, folder: str = '/home/stefan/mth/plots'):
+    def replay(self, fireflies: bool = False, save: Optional[str] = None, folder: str = '/home/stefan/mth/plots'):
         """
         Replays the building of the wall
 
@@ -163,7 +160,9 @@ class Wall:
             for stone in self.stones:
                 hist = stone.position_history
                 vel = [hist[i + 1].positions - hist[i].positions for i in range(len(hist) - 1)]
-                vel.insert(0, np.zeros((len(hist[0].positions), 3)))  # zero velocity at first iteration
+                if vel:
+                    # vel.insert(0, np.zeros((len(hist[0].positions), 3)))  # zero velocity at first iteration
+                    vel.append(np.zeros((len(hist[0].positions), 3)))
                 for iteration, velocity in zip(stone.position_history, vel):
                     iteration.velocities = np.array(velocity)
 

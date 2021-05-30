@@ -231,7 +231,7 @@ class Validator:
             score += 2 + 10 * res.intersection_volume / stone.mesh_volume
         # Distance to boundary
         if self.distance2boundary:
-            score += 5*res.distance2boundary
+            score += (1 + 5*res.distance2boundary)**2 - 1
         # free volume below the stone
         if self.volume_below_stone:
             score += res.volume_below_stone / stone.mesh_volume

@@ -5,47 +5,51 @@
 
 from time import time
 from datetime import datetime
+import random
+
+import numpy as np
 
 from trockenmauer.stone import Boundary
 from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
-from trockenmauer.math_utils import Translation, Rotation, RZ_90
+from trockenmauer.math_utils import Translation, Rotation, RotationTranslation, RZ_90
 from trockenmauer.validation import Validator
 from trockenmauer.placement import random_init_fixed_z
-from swarmlib.firefly_problem import FireflyProblem
+from trockenmauer.firefly import FireflyProblem
 
 
 STONES = 3
-FIREFLIES = 2
-ITERATIONS = 2
+FIREFLIES = 3
+ITERATIONS = 3
+FILENAME = None
+# FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
-filename = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
-
-boundary = Boundary()
+boundary = Boundary(x=1, y=.5, z=1, batter=.1)
 wall = Wall(boundary)
 
 validator = Validator(intersection_boundary=True, intersection_stones=True,
                       distance2boundary=True, volume_below_stone=True,
                       distance2closest_stone=True
                       )
-
-# 90° Rotation around z-axis
-rz_90 = Rotation(RZ_90)
-
+rz90 = Rotation(rotation=RZ_90, center=np.zeros(3))
 # Place the first stone manually
 stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(-1))
-stone.transform(rz_90)
-# translate the center to the wall
-t = Translation(stone.aabb_limits / 2)
-stone.transform(t)
-wall.add_stone()
+# 90° Rotation around z-axis, translation to a corner of the wall
+t = np.array([stone.aabb_limits[1][1],
+              stone.aabb_limits[1][0] + stone.aabb_limits[1][2] * boundary.batter,
+              -stone.bottom_center[2]])
+stone.transform(RotationTranslation(rotation=RZ_90, center=np.zeros(3), translation=t))
+wall.add_stone(stone)
 
-
+# generate stones
 
 start = time()
 for i in range(STONES):
     # Generate, optimize and plot a stone
     stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(i))
+    rotation = random.choice([True, False])
+    if rotation:
+        stone.transform(rz90)
     # Find a placement
     problem = FireflyProblem(FIREFLIES, validator.fitness, boundary.aabb_limits[0], boundary.aabb_limits[1],
                              iteration_number=ITERATIONS, init_function=random_init_fixed_z, stone=stone, wall=wall)
@@ -64,4 +68,4 @@ m, s = divmod(stop-start, 60)
 print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
 
 
-wall.replay(fireflies=True, save=filename)
+wall.replay(fireflies=True, save=FILENAME)

@@ -66,3 +66,6 @@ python -m venv venv
   - ``sudo venv/bin/pip install -e .``
 - Yade
   - ``sudo apt install yade``
+  - Es wird nicht installiert und ein Link in den Basis-Python-Interpreter erstellt
+  - Im Virtual environment kann aktiviert werden, dass die packages vom System Interpreter genutzt werden
+  - venv/pyvenv.cfg: ``include-system-site-packages = true``
