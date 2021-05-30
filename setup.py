@@ -18,7 +18,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'numpy', 'matplotlib'
+        'numpy', 'matplotlib==3.4.2', 'rtree'
     ],
     python_requires='>=3.8',
     url='https://github.com/hochstibe/mth',
