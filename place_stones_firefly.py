@@ -18,8 +18,8 @@ from trockenmauer.placement import solve_placement
 
 
 STONES = 10
-FIREFLIES = 15
-ITERATIONS = 30
+FIREFLIES = 10
+ITERATIONS = 20
 # FILENAME = None
 FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
