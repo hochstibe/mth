@@ -8,10 +8,23 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from .firefly import FireflyProblem
 
 if TYPE_CHECKING:
-    from trockenmauer.wall import Wall
+    from . import Wall, Stone, Validator
 
+
+def solve_placement(wall: 'Wall', stone: 'Stone', n_fireflies, n_iterations, validator: 'Validator'):
+    """
+    Find the optimal placement
+    """
+    # Find a placement
+    problem = FireflyProblem(n_fireflies, validator.fitness, wall.boundary.aabb_limits[0], wall.boundary.aabb_limits[1],
+                             iteration_number=n_iterations, pos_function=random_init_fixed_z, stone=stone, wall=wall)
+    res, history = problem.solve()
+    stone.position_history = history
+    # print(fitness, xyz)
+    return res
 
 def random_init_fixed_z(xyz: np.ndarray, wall: 'Wall', **kwargs):
     """
@@ -39,7 +52,7 @@ def random_init_fixed_z(xyz: np.ndarray, wall: 'Wall', **kwargs):
     return np.array([x, y, z])
 
 
-def find_placement(wall: 'Wall'):
+def find_random_placement(wall: 'Wall'):
     # Find a placement within the given area of the wall
 
     x = random.uniform(0, wall.boundary.x)

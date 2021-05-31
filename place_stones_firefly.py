@@ -14,15 +14,14 @@ from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.math_utils import Translation, Rotation, RotationTranslation, RZ_90
 from trockenmauer.validation import Validator
-from trockenmauer.placement import random_init_fixed_z
-from trockenmauer.firefly import FireflyProblem
+from trockenmauer.placement import solve_placement
 
 
-STONES = 3
-FIREFLIES = 3
-ITERATIONS = 3
-FILENAME = None
-# FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
+STONES = 10
+FIREFLIES = 15
+ITERATIONS = 30
+# FILENAME = None
+FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
 boundary = Boundary(x=1, y=.5, z=1, batter=.1)
 wall = Wall(boundary)
@@ -51,12 +50,10 @@ for i in range(STONES):
     if rotation:
         stone.transform(rz90)
     # Find a placement
-    problem = FireflyProblem(FIREFLIES, validator.fitness, boundary.aabb_limits[0], boundary.aabb_limits[1],
-                             iteration_number=ITERATIONS, init_function=random_init_fixed_z, stone=stone, wall=wall)
-    res, history = problem.solve()
-    stone.position_history = history
-    # print(fitness, xyz)
+    res = solve_placement(wall, stone, FIREFLIES, ITERATIONS, validator)
     print(i, res.position, res.value)
+
+    # Translate the stone to the optimal position and add to the wall
     t = Translation(translation=res.position - stone.bottom_center)
     stone.transform(transformation=t)
     wall.add_stone(stone)

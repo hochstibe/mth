@@ -40,6 +40,7 @@ python -m venv venv
 - ``sudo apt install pip-python3``  oderso ähnlich...
 - ``sudo apt-get install python3-venv`` 
 - ``sudo apt-get install python3-tk`` -> tinker backend für matplotlib
+- ``sudo apt-get install ffmpeg`` -> write mp4
 - Check python interpreter location: ``python3; import sys; sys.executable``  
 - Pymesh: https://github.com/PyMesh/PyMesh
   - ``git clone https://github.com/PyMesh/PyMesh.git``
@@ -64,6 +65,8 @@ python -m venv venv
   - ``source venv/bin/activate``
   - ``venv/bin/pip install -r requirements.txt``
   - ``sudo venv/bin/pip install -e .``
+  -  Damit es in yade ausgeführt werden kann, muss alles im Basisinterpreter installiert sein
+  - ``pip install -e mth`` installiert alle Packages ausser pymesh in den Basisinterpreter
 - Yade
   - ``sudo apt install yade``
   - Es wird nicht installiert und ein Link in den Basis-Python-Interpreter erstellt

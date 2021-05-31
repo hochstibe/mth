@@ -9,7 +9,7 @@ import time
 import pymesh
 from rtree import index
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
@@ -177,9 +177,12 @@ class Wall:
         plt.show()
         if save:
             folder = Path(folder)
-            file = folder / f'{save}.gif'
+            file = folder / f'{save}'
             print('Saving file to', file, '...')
-            anim.save(str(file), writer='pillow')
+            anim.save(f'{file}.gif', writer='pillow')
+            print('  GIF saved')
+            anim.save(f'{file}.mp4', writer=FFMpegWriter(fps=2))
+            print('  MP4 saved')
 
     def __repr__(self):
         return f'<Wall(boundary={self.boundary}, stones={self.stones})>'

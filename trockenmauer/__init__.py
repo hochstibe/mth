@@ -5,3 +5,4 @@
 
 from .stone import Boundary, Stone, Intersection
 from .wall import Wall
+from .validation import Validator

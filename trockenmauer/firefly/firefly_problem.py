@@ -42,7 +42,7 @@ class FireflyProblem:
             for _ in range(firefly_number)
         ]
 
-        self.__fireflies = np.sort(self.__fireflies)
+        # self.__fireflies = np.sort(self.__fireflies)
 
         # Initialize visualizer for plotting
         # self._visualizer = BaseVisualizer(**kwargs)
@@ -50,7 +50,8 @@ class FireflyProblem:
 
     def solve(self) -> Tuple[Firefly, List['Iteration']]:
         """Solve the problem."""
-        best = self.__fireflies[0]  # best firefly, sorted in __init__
+        # best = self.__fireflies[0]  # best firefly, sorted in __init__
+        best = min(self.__fireflies)
         history = list()  # history of firefly positions
         # Add initial data for visualization
         history.append(Iteration(np.array([firefly.position for firefly in self.__fireflies]),
@@ -67,13 +68,19 @@ class FireflyProblem:
                         i.move_towards(j.position)
             iteration += 1
 
-            self.__fireflies = np.sort(self.__fireflies)
-            current_best = self.__fireflies[0]
+            # self.__fireflies = np.sort(self.__fireflies)
+            # current_best = self.__fireflies[0]
+            current_best = min(self.__fireflies)
             if not best or current_best < best:
                 # update the best solution
                 # best = deepcopy(current_best)
                 best = copy(current_best)
-                no_update = 0
+
+                # If there is only a small update, update the counter
+                # if np.abs(current_best.value - best.value) < .001:
+                #     no_update += 1
+                # else:
+                #     no_update = 0
 
             else:
                 # no update of the best solution
