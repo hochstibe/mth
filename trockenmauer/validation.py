@@ -35,25 +35,11 @@ class Validator:
     - ...
     """
 
-    def __init__(self, intersection_boundary=False, intersection_stones=False,
-                 distance2boundary=False, volume_below_stone=False, distance2closest_stone=False):
-        """
-        The parameters control, witch validations will be executed
-
-        :param intersection_boundary: validate intersections with the boundary
-        :param intersection_stones: validate intersections with the previously placed stones
-        """
-        self.intersection_boundary = intersection_boundary
-        self.intersection_stones = intersection_stones
-        self.distance2boundary = distance2boundary
-        self.volume_below_stone = volume_below_stone
-        self.distance2closest_stone = distance2closest_stone
-
-        # initialize tetgen for tetrahedralization
-        self.tetgen = pymesh.tetgen()
-        self.tetgen.max_tet_volume = 2
-        self.tetgen.verbosity = 0  # no output
-        self.tetgen.split_boundary = False
+    # initialize tetgen for tetrahedralization
+    tetgen = pymesh.tetgen()
+    tetgen.max_tet_volume = 2
+    tetgen.verbosity = 0  # no output
+    tetgen.split_boundary = False
 
     @staticmethod
     def _bb_intersections(wall: 'Wall', bb: 'np.ndarray') -> List['Intersection']:
@@ -170,6 +156,64 @@ class Validator:
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
+        Dummy function, replaced in subclasses.
+        Validates the new stone to the built wall. All validation functions are used according to the
+        attributes set in the validator initialisation.
+        If the validation is passed, it returns True and en empty ValidationError-object.
+        If the validation fails, it returns False and the details in the ValidationError-object
+
+        :param stone:
+        :param wall:
+        :return: passed, results
+        """
+        passed = True
+        results = ValidationResult()
+
+        return passed, results
+
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> float:
+        """
+        Dummy function, replaced in subclasses.
+        Calculates the fitness of a placement for a stone.
+
+        :param firefly: Firefly with the three coordinates as genes
+        :param stone:
+        :param wall:
+        :return:
+        """
+        # move the bottom center of the stone to the given position
+        t = Translation(translation=firefly - stone.bottom_center)
+        stone.transform(transformation=t)
+        passed, res = self.validate(stone, wall)
+
+        if passed:
+            score = 0
+        else:
+            score = 1
+        return score
+
+
+class ValidatorNormal(Validator):
+
+    def __init__(self, intersection_boundary=False, intersection_stones=False,
+                 distance2boundary=False, volume_below_stone=False, distance2closest_stone=False):
+        """
+        The parameters control, witch validations will be executed
+
+        :param intersection_boundary: validate intersections with the boundary
+        :param intersection_stones: validate intersections with the previously placed stones
+        """
+        # Init tetgen from super()
+        super().__init__()
+
+        self.intersection_boundary = intersection_boundary
+        self.intersection_stones = intersection_stones
+        self.distance2boundary = distance2boundary
+        self.volume_below_stone = volume_below_stone
+        self.distance2closest_stone = distance2closest_stone
+
+    def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
+        """
         Validates the new stone to the built wall. All validation functions are used according to the
         attributes set in the validator initialisation.
         If the validation is passed, it returns True and en empty ValidationError-object.
@@ -207,7 +251,7 @@ class Validator:
 
         return passed, results
 
-    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs):
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> float:
         """
         Calculates the fitness of a placement for a stone.
 
@@ -227,8 +271,12 @@ class Validator:
         # - volume below the stone
         score = 0
         # intersection volume
-        if res.intersection:  # penalty any intersection with 1 and add 10* scaled volume
-            score += 2 + 10 * res.intersection_volume / stone.mesh_volume
+        # if res.intersection:  # penalty any intersection with 1 and add 10* scaled volume
+        #     score += 1 + res.intersection_volume / stone.mesh_volume
+        if res.intersection_boundary:
+            score += .5 + res.intersection_volume_b / stone.mesh_volume
+        if res.intersection_stones:
+            score += 1 + res.intersection_volume_s / stone.mesh_volume
         # Distance to boundary
         if self.distance2boundary:
             score += (1 + 5*res.distance2boundary)**2 - 1
@@ -239,7 +287,36 @@ class Validator:
         if self.distance2closest_stone:
             # no penalty, if there is no stone on the same level
             score += 5 * res.distance2closest_stone
+
+        # Punish stones that are not on the current level
+        if not wall.in_current_level(stone):
+            score += 2 + stone.aabb_limits[1][2]
         return score
+
+
+class ValidatorFill(Validator):
+
+    def __init__(self):
+        super().__init__()
+
+    def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
+
+        passed = True
+        results = ValidationResult()
+
+        return passed, results
+
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> float:
+
+        # move the bottom center of the stone to the given position
+        t = Translation(translation=firefly - stone.bottom_center)
+        stone.transform(transformation=t)
+        passed, res = self.validate(stone, wall)
+        
+        if passed:
+            return 0
+        else:
+            return 1
 
 
 @dataclass
@@ -252,9 +329,19 @@ class ValidationResult:
     __intersection_stones: List['Intersection'] = False  # All Intersections with other stones
     _intersection: bool = False  # whether there is any intersection or not
     _intersection_volume: float = 0  # total intersection volume
+    _intersection_volume_b: float = 0
+    _intersection_volume_s: float = 0
     distance2boundary: float = 0  # minimal distance to the boundary
     volume_below_stone: float = 0  # total free volume below the stone
     distance2closest_stone: float = 0
+
+    @property
+    def intersection_volume_b(self):
+        return self._intersection_volume_b
+
+    @property
+    def intersection_volume_s(self):
+        return self._intersection_volume_b
 
     @property
     def intersection_boundary(self) -> 'Intersection':
@@ -277,12 +364,14 @@ class ValidationResult:
         self.__intersection_boundary = new_intersection
         self._intersection = True
         self.update_total_volume(new_intersection)
+        self._intersection_volume_b = new_intersection.mesh_volume
 
     @intersection_stones.setter
     def intersection_stones(self, new_intersections: List['Intersection']):
         self.__intersection_stones = new_intersections
         self._intersection = True
         map(self.update_total_volume, new_intersections)
+        self._intersection_volume_s += np.sum([i.aabb_volume for i in new_intersections])
 
     def update_total_volume(self, new_intersection: 'Intersection'):
         # update the volume: try first the exact mesh volume. if not available, use aabb volume

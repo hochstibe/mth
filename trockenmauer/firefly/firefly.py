@@ -10,7 +10,7 @@ import numpy as np
 
 class Firefly:
     def __init__(self, alpha, beta, gamma, lower_boundary, upper_boundary, function,
-                 bit_generator, pos_function, **kwargs):
+                 bit_generator, pos_function, coord=None, **kwargs):
 
         scale = upper_boundary - lower_boundary
         self.__alpha = alpha * scale
@@ -26,9 +26,13 @@ class Firefly:
         self.pos_function = pos_function
         self._kwargs = kwargs  # additional arguments fur the function
 
-        self.__value = None
         self.__position = None
-        self._initialize()
+        self.__value = None
+
+        if np.any(coord):
+            self._position = coord
+        else:
+            self._initialize()
 
     def move_towards(self, better_position):
         # euclidean distance
@@ -37,7 +41,9 @@ class Firefly:
         # update position
         self._position = self._position + \
             self.__beta*np.exp(-self.__gamma*(distance**2)) * (better_position-self._position) + \
-            self.__alpha*(self._random.uniform(0, 1, 3)-0.5)
+            self.__alpha*self._random.normal(0, 1, 3)
+        # self.__alpha*self._random.uniform(-1, 1, 3)
+        # Todo: Random Walk: uniform [-1:1] -> Gauss [mu=0, sigma=1]
 
     def random_walk(self, area):
         self._position = self._random.uniform(self._position-area, self._position+area, 3)

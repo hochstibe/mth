@@ -28,6 +28,7 @@ class Geometry:
     triangles_values: np.ndarray = None  # triangle coordinates
     _aabb_limits: np.ndarray = None  # np.array([[xmin, ymin, zmin], [xmax, ymax, zmax]])
     _aabb_volume: float = None
+    _aabb_area: float = None
 
     def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
@@ -66,14 +67,23 @@ class Geometry:
         # Todo: what if there is a mesh and aabb_limits --> have to be the same
         self._aabb_limits = limits
         self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+        self._aabb_limits = np.prod(self._aabb_limits[1][:2] - self._aabb_limits[0][:2])
 
     @property
     def aabb_volume(self):
         # calculated the first time accessed, no setter possible
-        if not self._aabb_volume and self._aabb_limits:
-            # no vol yet but there is a aabb])
+        if not np.any(self._aabb_volume) and np.any(self._aabb_limits):
+            # no vol yet but there is a aabb
             self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
         return self._aabb_volume
+
+    @property
+    def aabb_area(self):
+        # calculated the first time accessed, no setter possible
+        if not np.any(self._aabb_area) and np.any(self._aabb_limits):
+            # no area yet but there is a aabb
+            self._aabb_area = np.prod(self._aabb_limits[1][:2] - self._aabb_limits[0][:2])
+        return self._aabb_area
 
     def aabb_overlap(self, other_limits: 'np.ndarray') -> Optional['np.ndarray']:
         """
@@ -371,7 +381,7 @@ class Stone(Geometry):
         self.top_center = top.mean(axis=0)
         self.top_n = np.cross(top[1] - top[0], top[2] - top[0])
 
-        self.height = self.top_center[2] - self.bottom_center[2]
+        self.height = np.linalg.norm(self.top_center - self.bottom_center)
 
         if np.any(self.sides):
             self.sides_center = [self.mesh.vertices[s].mean(axis=0) for s in self.sides]

@@ -15,7 +15,7 @@ from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.plot import set_axes_equal
 from trockenmauer.math_utils import Translation
 from trockenmauer.validation import Validator
-from trockenmauer.placement import random_init_fixed_z
+from trockenmauer.placement import xy_fixed_z
 from swarmlib.firefly_problem import FireflyProblem
 
 
@@ -50,7 +50,7 @@ def func(i):
     stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(i))
     # Find a placement
     problem = FireflyProblem(10, validator.fitness, boundary.aabb_limits[0], boundary.aabb_limits[1],
-                             iteration_number=40, init_function=random_init_fixed_z, stone=stone, wall=wall)
+                             iteration_number=40, init_function=xy_fixed_z, stone=stone, wall=wall)
     res = problem.solve()
     # print(fitness, xyz)
     print(i, res.position, res.value)

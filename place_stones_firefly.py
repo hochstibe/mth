@@ -5,7 +5,6 @@
 
 from time import time
 from datetime import datetime
-import random
 
 import numpy as np
 
@@ -13,23 +12,26 @@ from trockenmauer.stone import Boundary
 from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.math_utils import Translation, Rotation, RotationTranslation, RZ_90
-from trockenmauer.validation import Validator
-from trockenmauer.placement import solve_placement
+from trockenmauer.validation import ValidatorNormal
+from trockenmauer.placement import solve_placement, random_xy_on_current_building_level
 
 
 STONES = 10
-FIREFLIES = 10
-ITERATIONS = 20
-# FILENAME = None
-FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
+FIREFLIES = 30
+ITERATIONS = 40
+FILENAME = None
+SEED = None
+# FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
+# random generator for comparable results
+random = np.random.default_rng(SEED)
 boundary = Boundary(x=1, y=.5, z=1, batter=.1)
 wall = Wall(boundary)
 
-validator = Validator(intersection_boundary=True, intersection_stones=True,
-                      distance2boundary=True, volume_below_stone=True,
-                      distance2closest_stone=True
-                      )
+validator = ValidatorNormal(intersection_boundary=True, intersection_stones=True,
+                            distance2boundary=True, volume_below_stone=True,
+                            distance2closest_stone=True
+                            )
 rz90 = Rotation(rotation=RZ_90, center=np.zeros(3))
 # Place the first stone manually
 stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(-1))
@@ -44,13 +46,28 @@ wall.add_stone(stone)
 
 start = time()
 for i in range(STONES):
+    print(f'stone {i} -----------------------------')
     # Generate, optimize and plot a stone
     stone = generate_regular_stone(.25, 0.15, 0.1, edge_noise=0.5, name=str(i))
     rotation = random.choice([True, False])
     if rotation:
         stone.transform(rz90)
     # Find a placement
-    res = solve_placement(wall, stone, FIREFLIES, ITERATIONS, validator)
+    print('free area:', wall.level_free*wall.level_area, 'stone area', stone.aabb_area)
+    init_pos = np.array([random_xy_on_current_building_level(wall, random) for _ in range(FIREFLIES)])
+    if np.all(init_pos[:, 2] == wall.level_h[wall.level][0]):
+        print('all placement on the current building level', (init_pos[init_pos[:, 2] == wall.level_h[wall.level][0]])[:, 2].flatten())
+    else:
+        print('some placements on higher level after 5 tries')
+        print(init_pos[init_pos[:, 2] == wall.level_h[wall.level][0]])
+    # --> Fazit: Bringt nichts, entweder stimmt etwas nicht mit den verbesserten Startpositionen oder
+    # -->        es müssen Startpositionen ohne Überschneidungen sein
+
+    res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
+                          validator=validator, seed=random)
+    # Todo: reduce the number of fireflies after 3 iterations (usually already converged
+    # Maybe add a rotation in the first 3 iterations and use the better of 2 solutions per position
+    # Maybe add the rotation only in the initial positions
     print(i, res.position, res.value)
 
     # Translate the stone to the optimal position and add to the wall

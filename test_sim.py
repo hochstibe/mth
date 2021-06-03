@@ -64,7 +64,7 @@ def checkUnbalanced():
             # res = solve_placement(wall, s, 3, 3, validator)
             # print(f'--> {res.position}, {res.value}')
             # p = polyhedra_utils.polyhedra(mat, v=s.mesh.vertices)
-            s.state.pos = (1, .5, 1)
+            s.state.pos = (1, .5, .1)
             O.bodies.append(s)
             PLACED_STONES += 1
             # O.run()
@@ -83,7 +83,7 @@ O.engines = [
     ),
     # Add gravity
     # GravityEngine(gravity=(0, 0, -9.81)),
-    NewtonIntegrator(damping=.5, gravity=(0, 0, -9.81)),  # damping=.5
+    NewtonIntegrator(damping=.9, gravity=(0, 0, -9.81)),  # damping=.5
     # Check for unbalanced forces every second
     PyRunner(command='checkUnbalanced()', realPeriod=1, label='checker')
 

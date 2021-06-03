@@ -23,10 +23,10 @@ beta = 1  # 1
 gamma = 1 / np.sqrt(scale)  # .97
 
 position = np.array([0, 0, 0])
-better_position = np.array([1, .25, .5])
+better_position = np.array([2, .5, 1])
 
 distance = np.linalg.norm(position - better_position)
-new_pos = position + beta*np.exp(-gamma*(distance**2)) * (better_position-position) + alpha*(random.uniform(0, 1, 3)-0.5)
+new_pos = position + beta*np.exp(-gamma*(distance**2)) * (better_position-position) + alpha*(random.uniform(-1, 1, 3))
 print('alpha', alpha, 'beta', beta, 'gamma', gamma)
 print(position, 'original distance', distance)
 print(new_pos, 'moved distance', np.linalg.norm(new_pos - position))

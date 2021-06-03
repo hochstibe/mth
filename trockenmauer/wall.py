@@ -24,8 +24,14 @@ class Wall:
     A wall consists of the placed stones and the boundary.
     """
     boundary: 'Boundary' = None
-    stones: List['Stone'] = []
+    stones: List['Stone'] = [0, ]
     mesh: 'pymesh.Mesh' = None
+
+    # The wall is built in levels: the algorithm tries to build one level after another
+    level: int = 0  # enumeration (index) of the current building level
+    level_h: List[List] = [[0, .1], ]  # List of [min z, max z] of the building levels
+    level_free: float = 1  # ratio of free area on the current level
+    _level_area: float = None
 
     def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'pymesh.Mesh' = None):
         self.boundary = boundary
@@ -45,6 +51,12 @@ class Wall:
         self._ax = None
         self._stone_frames = None  # lookup to find the stone based on the frame index
 
+    @property
+    def level_area(self):
+        if not self._level_area:
+            self._level_area = self.boundary.x * (self.boundary.y - 2*self.level_h[self.level][0]*self.boundary.batter)
+        return self._level_area
+
     def add_stone(self, stone: 'Stone'):
         # Add the stone to the mesh
         if not self.mesh:
@@ -61,6 +73,24 @@ class Wall:
         i = len(self.stones) - 1  # index of the stone
         # Add the BB to the tree, the name of the stone is the index in the stones-list
         self.r_tree.insert(i, stone.aabb_limits.flatten())
+
+        h_min, h_max = self.level_h[self.level]
+        if self.in_current_level(stone):
+            # update h_max
+            # on the current level, set h_max of the current level (could increase a bit)
+            self.level_h[self.level] = [h_min, np.max([h_max, stone.aabb_limits[1][2]])]
+            # print('stone on the current level, update the limits')
+
+            # update the free area
+            self.level_free -= stone.aabb_area / self.level_area
+
+    def in_current_level(self, stone: 'Stone') -> bool:
+        h_min, h_max = self.level_h[self.level]
+        if stone.aabb_limits[1][2] < h_max + (h_max - h_min) / 3:
+            # on the current level
+            return True
+        else:
+            return False
 
     def _init(self):
         """
@@ -159,10 +189,20 @@ class Wall:
             # calculate the velocities for the fireflies
             for stone in self.stones:
                 hist = stone.position_history
-                vel = [hist[i + 1].positions - hist[i].positions for i in range(len(hist) - 1)]
+                # vel = [hist[i + 1].positions - hist[i].positions for i in range(len(hist) - 1)]
+                vel = list()
+                for i in range(len(hist) - 1):
+                    t1 = hist[i + 1].positions.copy()
+                    t0 = hist[i].positions
+                    if len(t1) < len(t0):
+                        t1 = np.vstack((t1, t0[len(t1):]))
+                        # print('add more dimensions to ti+1. Dim at t-1', vel[-1].shape, 'dim at t', (t1-t0).shape)
+                    vel.append(t1 - t0)
+                    # print(len(hist[i].positions), len(vel[i]))
+
                 if vel:
                     # vel.insert(0, np.zeros((len(hist[0].positions), 3)))  # zero velocity at first iteration
-                    vel.append(np.zeros((len(hist[0].positions), 3)))
+                    vel.append(np.zeros((len(hist[-1].positions), 3)))
                 for iteration, velocity in zip(stone.position_history, vel):
                     iteration.velocities = np.array(velocity)
 
