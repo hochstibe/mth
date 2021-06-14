@@ -3,37 +3,39 @@
 # Stefan Hochuli, 26.02.2021, generate_stones.py
 #
 
-import random
-from typing import List
+from typing import Union, Tuple
 
 import numpy as np
 
 from .stone import Stone
 
 
-def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (1, 1),
+def generate_regular_stone(x: Union[Tuple[float, float], float],
+                           y: Union[Tuple[float, float], float],
+                           z: Union[Tuple[float, float], float],
+                           random: 'np.random.Generator' = np.random.default_rng(),
                            edge_noise: float = 0.3,
                            name: str = None) -> 'Stone':
     """
     Stone generator for target size (in meter), uniform noise
 
-    :param x: target length in x-direction
-    :param y: target length in y-direction
-    :param z: target length in z-direction
-    :param scale: apply a scaling-factor to all three directions
+    :param x: target length in x-direction or boundary (min, max)
+    :param y: target length in y-direction or boundary (min, max)
+    :param z: target length in z-direction or boundary (min, max)
+    :param random: Generator for random numbers
     :param edge_noise: uniform noise for the length of an edge, within ``+- e*edge_noise``
     :param name: Name of the stone
     :return:
     """
-    scale = random.uniform(scale[0], scale[1])
+    if isinstance(x, float) and isinstance(y, float) and isinstance(z, float):
+        low = np.array([x, y, z]) - np.array([x, y, z]) * edge_noise
+        high = np.array([x, y, z]) + np.array([x, y, z]) * edge_noise
+    else:
+        low = np.array([x[0], y[0], z[0]])
+        high = np.array([x[1], y[1], z[1]])
 
     # Coordinates of one corner (first quadrant, all coordinates positive)
-    x = scale * random.uniform(x - x * (edge_noise / 2),  x + x * (edge_noise / 2))
-    y = scale * random.uniform(y - y * (edge_noise / 2),  y + y * (edge_noise / 2))
-    z = scale * random.uniform(z - z * (edge_noise / 2),  z + z * (edge_noise / 2))
-    # x = scale * random.uniform(-x / 2, x / 2)
-    # y = scale * random.uniform (-y / 2, y / 2)
-    # z = scale * random.uniform(-z / 2, z / 2)
+    x, y, z = random.uniform(low, high, 3)
 
     a = [0, 0, 0]
     b = [x, 0, 0]
@@ -46,8 +48,6 @@ def generate_regular_stone(x: float, y: float, z: float,  scale: List[float] = (
     v = np.array([a, b, c, d,  # lower 4 vertices
                   e, f, g, h])  # upper 4 vertices
 
-    # v = np.array([[x, y, z], [-x, y, z], [-x, -y, z], [x, -y, z],  # upper 4 vertices
-    #               [x, y, -z], [-x, y, -z], [-x, -y, -z], [x, -y, -z]])  # lower 4 vertices
     if name:
         return Stone(v, name=name)
     return Stone(v)

@@ -111,7 +111,7 @@ class Validator:
             return False, None
 
     @staticmethod
-    def _distance2mesh(points: List[np.ndarray], mesh: 'pymesh.Mesh') -> List:
+    def _distance2mesh(points: np.ndarray, mesh: 'pymesh.Mesh') -> List:
         # for each point: [squared distance, closest face, closest point]
         distances, faces, closest_points = pymesh.distance_to_mesh(mesh, points, engine='cgal')
         return distances
@@ -251,7 +251,7 @@ class ValidatorNormal(Validator):
 
         return passed, results
 
-    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> float:
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> 'ValidationResult':
         """
         Calculates the fitness of a placement for a stone.
 
@@ -290,8 +290,9 @@ class ValidatorNormal(Validator):
 
         # Punish stones that are not on the current level
         if not wall.in_current_level(stone):
-            score += 2 + stone.aabb_limits[1][2]
-        return score
+            score += 2 + stone.aabb_limits[1][2]  # 2 +
+        res.score = score
+        return res
 
 
 class ValidatorFill(Validator):
@@ -329,11 +330,14 @@ class ValidationResult:
     __intersection_stones: List['Intersection'] = False  # All Intersections with other stones
     _intersection: bool = False  # whether there is any intersection or not
     _intersection_volume: float = 0  # total intersection volume
+    _intersection_area: float = 0  # total intersection area
     _intersection_volume_b: float = 0
     _intersection_volume_s: float = 0
     distance2boundary: float = 0  # minimal distance to the boundary
     volume_below_stone: float = 0  # total free volume below the stone
     distance2closest_stone: float = 0
+
+    score: float = 0
 
     @property
     def intersection_volume_b(self):
@@ -359,6 +363,10 @@ class ValidationResult:
     def intersection_volume(self) -> float:
         return self._intersection_volume
 
+    @property
+    def intersection_area(self) -> float:
+        return self._intersection_area
+
     @intersection_boundary.setter
     def intersection_boundary(self, new_intersection: 'Intersection'):
         self.__intersection_boundary = new_intersection
@@ -381,3 +389,5 @@ class ValidationResult:
             self._intersection_volume += new_intersection.aabb_volume
         else:
             print('intersection but no volume added')
+        # update intersection area
+        self._intersection_area += new_intersection.aabb_area

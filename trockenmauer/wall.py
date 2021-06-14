@@ -2,18 +2,19 @@
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
 # Stefan Hochuli, 27.05.21, wall.py
 #
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Tuple, Optional, TYPE_CHECKING
 from pathlib import Path
 import time
 
 import pymesh
 from rtree import index
 from matplotlib import pyplot as plt
-from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 from .plot import set_axes_equal
+from .generate_stones import generate_regular_stone
 
 if TYPE_CHECKING:
     from . import Stone, Boundary
@@ -24,8 +25,11 @@ class Wall:
     A wall consists of the placed stones and the boundary.
     """
     boundary: 'Boundary' = None
-    stones: List['Stone'] = [0, ]
     mesh: 'pymesh.Mesh' = None
+    stones: List['Stone'] = [0, ]    # List of placed stones Todo: Why [0, ]???
+
+    # List of available stones
+    normal_stones: List['Stone'] = []
 
     # The wall is built in levels: the algorithm tries to build one level after another
     level: int = 0  # enumeration (index) of the current building level
@@ -50,6 +54,16 @@ class Wall:
         self._fig = None
         self._ax = None
         self._stone_frames = None  # lookup to find the stone based on the frame index
+
+    def init_stones(self, n_normal_stones: int,  normal_x_range: Tuple[float, float],
+                    normal_y_range: Tuple[float, float], normal_z_range: Tuple[float, float],
+                    random: 'np.random.Generator'):
+
+        # Generate and align stones to the coordinate axis
+        self.normal_stones = [generate_regular_stone(normal_x_range, normal_y_range, normal_z_range, random)
+                              for _ in range(n_normal_stones)]
+        # Order by their volume
+        self.normal_stones.sort(key=lambda x: x.aabb_volume, reverse=True)
 
     @property
     def level_area(self):
@@ -78,6 +92,8 @@ class Wall:
         if self.in_current_level(stone):
             # update h_max
             # on the current level, set h_max of the current level (could increase a bit)
+            if h_max < stone.aabb_limits[1][2]:
+                print('update current level-limits from', stone.aabb_limits[1][2], 'to', h_max)
             self.level_h[self.level] = [h_min, np.max([h_max, stone.aabb_limits[1][2]])]
             # print('stone on the current level, update the limits')
 

@@ -114,7 +114,6 @@ class FireflyProblem:
                 self.__fireflies = self.__fireflies[:5]
         print(iteration, 'iterations, no update for', no_update)
 
-
         return best, history
 
 

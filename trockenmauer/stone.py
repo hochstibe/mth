@@ -29,6 +29,13 @@ class Geometry:
     _aabb_limits: np.ndarray = None  # np.array([[xmin, ymin, zmin], [xmax, ymax, zmax]])
     _aabb_volume: float = None
     _aabb_area: float = None
+    # length / width / height are independent of the orientation and rotation of the geometry
+    _length: float = None
+    _width: float = None
+    _height: float = None
+
+    # visualization
+    color: str = 'gray'
 
     def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
@@ -36,14 +43,14 @@ class Geometry:
             self.mesh = mesh
 
     def _calc_triangle_values(self):
-        return [[self.mesh.vertices[j] for j in t_ind] for t_ind in self.mesh.faces]
+        return np.array([[self.mesh.vertices[j] for j in t_ind] for t_ind in self.mesh.faces])
 
     def _calc_aabb_limits(self):
         return np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)])
 
     def _update_mesh_properties(self):
         self.triangles_values = self._calc_triangle_values()
-        self._aabb_limits = self._calc_aabb_limits()
+        self.aabb_limits = self._calc_aabb_limits()
 
     @property
     def mesh(self):
@@ -57,24 +64,26 @@ class Geometry:
     @property
     def aabb_limits(self):
         if not np.any(self._aabb_limits) and self.mesh:
-            # no aabb yet but there is a mesh
-            self._aabb_limits = np.array([np.min(self.mesh.vertices, axis=0), np.max(self.mesh.vertices, axis=0)])
-            self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+            # no aabb yet but there is a mesh -> use the setter to calculate volume, area and l/w/h
+            self.aabb_limits = self._calc_aabb_limits()
         return self._aabb_limits
 
     @aabb_limits.setter
-    def aabb_limits(self, limits):
-        # Todo: what if there is a mesh and aabb_limits --> have to be the same
+    def aabb_limits(self, limits: 'np.ndarray'):
+        # what if there is a mesh and aabb_limits --> have to be the same
         self._aabb_limits = limits
-        self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
-        self._aabb_limits = np.prod(self._aabb_limits[1][:2] - self._aabb_limits[0][:2])
+        self._aabb_volume = float(np.prod(limits[1] - limits[0]))
+        self._aabb_area = float(np.prod(limits[1][:2] - limits[0][:2]))
+        diff = limits[1] - limits[0]
+        diff.sort()
+        self._height, self._width, self._length = diff
 
     @property
     def aabb_volume(self):
         # calculated the first time accessed, no setter possible
         if not np.any(self._aabb_volume) and np.any(self._aabb_limits):
             # no vol yet but there is a aabb
-            self._aabb_volume = np.prod(self._aabb_limits[1] - self._aabb_limits[0])
+            self._aabb_volume = float(np.prod(self._aabb_limits[1] - self._aabb_limits[0]))
         return self._aabb_volume
 
     @property
@@ -82,8 +91,20 @@ class Geometry:
         # calculated the first time accessed, no setter possible
         if not np.any(self._aabb_area) and np.any(self._aabb_limits):
             # no area yet but there is a aabb
-            self._aabb_area = np.prod(self._aabb_limits[1][:2] - self._aabb_limits[0][:2])
+            self._aabb_area = float(np.prod(self._aabb_limits[1][:2] - self._aabb_limits[0][:2]))
         return self._aabb_area
+
+    @property
+    def length(self):
+        return self._length
+
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def height(self):
+        return self._height
 
     def aabb_overlap(self, other_limits: 'np.ndarray') -> Optional['np.ndarray']:
         """
@@ -107,13 +128,13 @@ class Geometry:
 
         return np.array([overlap_min, overlap_max])
 
-    def add_shape_to_ax(self, ax, color='red'):
+    def add_shape_to_ax(self, ax):  # , color='red'):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
         ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
-                  color=color, marker='.', markersize=1)
+                  color=self.color, marker='.', markersize=1)
         # triangulation
-        col = Poly3DCollection(self.triangles_values, linewidths=1, edgecolors=color, alpha=.1)
-        col.set_facecolor(color)
+        col = Poly3DCollection(self.triangles_values, linewidths=1, edgecolors=self.color, alpha=.1)
+        col.set_facecolor(self.color)
         ax.add_collection3d(col)
 
     def __repr__(self):
@@ -160,6 +181,7 @@ class Boundary(Geometry):
         :param z: Height [m]
         """
         super().__init__(name=name)
+        self.color = 'grey'
         self.x = x
         self.y = y
         self.z = z
@@ -219,7 +241,7 @@ class Boundary(Geometry):
         ])
         self.mesh_solid_sides = pymesh.form_mesh(vertices, triangles_index)
 
-    def add_shape_to_ax(self, ax, color='grey'):
+    def add_shape_to_ax(self, ax):  # , color='grey'):
         """
         Adds the boundaries to the plot
 
@@ -229,7 +251,7 @@ class Boundary(Geometry):
         """
         # Default color is different than from Geometry.add_shape_to_ax()
         # Todo: pass kwargs for setting the Poly3DCollection attributes
-        super().add_shape_to_ax(ax, color)
+        super().add_shape_to_ax(ax)  # , color)
 
     def __repr__(self):
         return f'<Boundary(vertices=array([{(self.mesh.vertices[:2])}, ...])>'
@@ -252,10 +274,9 @@ class Stone(Geometry):
     top: np.ndarray = None  # vertices of the top face
     top_center: np.ndarray = None  # center of the top face
     top_n: np.ndarray = None  # normal of the top face
-    height: float  # not used yet
 
-    sides: List[np.ndarray] = None  # list of the sides of the stone (indices to the mesh)
-    sides_center: List[np.ndarray] = None  # center point (mean) of each side
+    sides: np.ndarray = None  # list of the sides of the stone (indices to the mesh)
+    sides_center: np.ndarray = None  # center point (mean) of each side
     # sides_n: List[np.ndarray] = None
 
     # History of the firefly positions
@@ -272,6 +293,7 @@ class Stone(Geometry):
         :param name: optional name for a stone
         """
         super().__init__()
+        self.color = 'green'
 
         if name:
             self.name = name
@@ -381,10 +403,10 @@ class Stone(Geometry):
         self.top_center = top.mean(axis=0)
         self.top_n = np.cross(top[1] - top[0], top[2] - top[0])
 
-        self.height = np.linalg.norm(self.top_center - self.bottom_center)
+        # self.height = np.linalg.norm(self.top_center - self.bottom_center)
 
         if np.any(self.sides):
-            self.sides_center = [self.mesh.vertices[s].mean(axis=0) for s in self.sides]
+            self.sides_center = np.array([self.mesh.vertices[s].mean(axis=0) for s in self.sides])
 
     def pca(self, vertices: np.ndarray = None):
         """
@@ -414,7 +436,7 @@ class Stone(Geometry):
         self._update_mesh_properties()
         # print(self.name, 'from',  np.round(c_1, 5), 'to', np.round(self.bottom_center, 5))
 
-    def add_shape_to_ax(self, ax, color: str = 'green'):
+    def add_shape_to_ax(self, ax):  # , color: str = 'green'):
         """
         Adds the shape of the stone (triangles) to the plot
 
@@ -422,7 +444,7 @@ class Stone(Geometry):
         :param color: color for the plot, e.g. 'g', 'r', 'green'
         :return: -
         """
-        super().add_shape_to_ax(ax, color)
+        super().add_shape_to_ax(ax)  # , color)
 
         # Plot the points
         # ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],

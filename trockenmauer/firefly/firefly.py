@@ -5,7 +5,13 @@
 
 # pylint: disable=too-many-arguments
 
+
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    from ..validation import ValidationResult
 
 
 class Firefly:
@@ -28,6 +34,7 @@ class Firefly:
 
         self.__position = None
         self.__value = None
+        self.__validation_result = None
 
         if np.any(coord):
             self._position = coord
@@ -83,11 +90,16 @@ class Firefly:
         self.__position = np.clip(new_pos, a_min=self.__lower_boundary, a_max=self.__upper_boundary)
         if self.pos_function:
             self.__position = self.pos_function(self.__position, **self._kwargs)
-        self.__value = self._function(self.__position, **self._kwargs)
+        self.__validation_result = self._function(self.__position, **self._kwargs)
+        self.__value = self.__validation_result.score
 
     @property
     def value(self) -> float:
         return self.__value
+
+    @property
+    def validation_result(self) -> 'ValidationResult':
+        return self.__validation_result
 
     def __eq__(self, other) -> bool:
         return self.__value == other.value
