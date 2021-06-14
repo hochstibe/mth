@@ -43,12 +43,14 @@ class FireflyProblem:
         self._random_walk_area = random_walk_area
         # Create fireflies
         if isinstance(firefly_number, int):
+            # initialize fireflies with random positions
             self.__fireflies = [
                 Firefly(alpha, beta, gamma, lower_boundary, upper_boundary, function,
                         bit_generator=self._random, init_function=init_function,  **kwargs)
                 for _ in range(firefly_number)
             ]
         else:
+            # initialize with random walk on given positions
             self.__fireflies = [
                 Firefly(alpha, beta, gamma, lower_boundary, upper_boundary, function, coord=coord,
                         bit_generator=self._random, init_function=init_function,  **kwargs)

@@ -37,7 +37,10 @@ class Firefly:
         self.__validation_result = None
 
         if np.any(coord):
-            self._position = coord
+            self.__position = coord
+            # move with no distance -> random walk
+            self.move_towards(coord)
+
         else:
             self._initialize()
 

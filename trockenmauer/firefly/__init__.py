@@ -4,4 +4,4 @@
 #
 
 from .firefly import Firefly
-from .firefly_problem import FireflyProblem
+from .firefly_problem import FireflyProblem, Iteration

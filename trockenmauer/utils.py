@@ -16,9 +16,11 @@ def pick_smaller_stone(invalid_stone: 'Stone', stones: List['Stone'],
                        overlapping_area: float, keep: str = 'width') -> int:
     # return the index to the list of stones for the smaller stone
     # stones are ordered by their volume or area --> the first match is good
-    # same width -> reduce length
+    if overlapping_area > 0.00001:
+        print('!!! overlappping area false', overlapping_area)
     rotate = False
     if keep == 'width':
+        # same width -> reduce length
         overlap_l = overlapping_area / invalid_stone.width
         target_l = invalid_stone.length - overlap_l
         target_w = invalid_stone.width
@@ -46,7 +48,8 @@ def pick_smaller_stone(invalid_stone: 'Stone', stones: List['Stone'],
         return None
     # Todo: rotate, if not initial fireflies try both
     if rotate:
-        match.transform(Rotation(RZ_90))
+        # match.transform(Rotation(RZ_90))
+        pass
 
     return stones.index(match)
 
