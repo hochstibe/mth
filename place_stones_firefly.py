@@ -15,14 +15,16 @@ from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.utils import pick_smaller_stone
 from trockenmauer.math_utils import Translation, Rotation, RotationTranslation, RZ_90
 from trockenmauer.validation import ValidatorNormal
-from trockenmauer.placement import solve_placement, random_xy_on_current_building_level
+from trockenmauer.placement import solve_placement, random_xy_on_current_building_level, corner_placement
 
 
-STONES = 20
+STONES = 20  # available stones
+STONES_LIM = 10  # number of (normal) stones to place
 FIREFLIES = 5
-ITERATIONS = 3
+ITERATIONS = 5
 FILENAME = None
 SEED = None
+LEVEL_COVERAGE = 0.25
 # FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
 # random generator for comparable results
@@ -42,26 +44,21 @@ wall.init_stones(STONES, (.1, .3), (.075, .2), (.05, .15), random)
 # normal_stones = [generate_regular_stone((.1, .3), (.075, .2), (.05, .15), random) for _ in range(STONES)]
 # normal_stones.sort(key=lambda x: x.aabb_volume, reverse=True)
 # Place the first stone manually
-stone = wall.normal_stones[0]
-# 90° Rotation around z-axis, translation to a corner of the wall
-t = np.array([stone.aabb_limits[1][1],
-              stone.aabb_limits[1][0] + stone.aabb_limits[1][2] * boundary.batter,
-              -stone.bottom_center[2]])
-stone.transform(RotationTranslation(rotation=RZ_90, center=np.zeros(3), translation=t))
-wall.add_stone(stone)
-wall.normal_stones.pop(0)
+corner_placement(wall, 'left')
+corner_placement(wall, 'right')
 
 start = time()
-placed_stones = 1
+placed_stones = 2
+invalid_level_counter = 0
 # for i in range(15):
-while placed_stones < 7 and wall.normal_stones:
+while placed_stones < 9 and wall.normal_stones:
     # print(f'stone {placed_stones} -----------------------------')
     # Pick the stones from biggest to smallest -> pick one of the 25% biggest stones
     stone_index = random.integers(0, np.max((1, np.round(len(wall.normal_stones)/4))))
 
     stone = copy(wall.normal_stones[stone_index])
 
-    print(f'stone {placed_stones} - {stone.name}                                           ----------------------------')
+    print(f'stone {placed_stones} - {stone.name} ----------------------------')
     rotation = random.choice([True, False])
     if rotation:
         stone.transform(rz90)
@@ -86,12 +83,16 @@ while placed_stones < 7 and wall.normal_stones:
         # add the stone with intersection -> red
         wall.add_stone(stone, invalid_color='orange')
 
-        stone_index_small = pick_smaller_stone(stone, wall.normal_stones, overlapping_area=res.validation_result.intersection_area)
+        stone_index_small, rot = pick_smaller_stone(
+            stone, wall.normal_stones, overlapping_area=res.validation_result.intersection_area)
+
         if not stone_index_small:  # no smaller stone available
             print('no smaller stone available -> filler? -> next level?')
+            invalid_level_counter += 1
             wall.normal_stones.pop(stone_index)
         else:
             stone = copy(wall.normal_stones[stone_index_small])
+            stone.transform(Rotation(rot))
             init_pos = res.position * np.ones((int(FIREFLIES/2), 1))  # start with only half the fireflies
             res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
                                   validator=validator, seed=random)
@@ -100,8 +101,14 @@ while placed_stones < 7 and wall.normal_stones:
                 print('smaller stone also intersects...')
                 # add the stone with intersection -> orange
                 wall.add_stone(stone, invalid_color='red')
-                print('original stone removed')
-                wall.normal_stones.pop(stone_index)
+                # print('original stone removed')
+                # wall.normal_stones.pop(stone_index)
+                invalid_level_counter += 1
+
+                # if invalid_level_counter > 3 or wall.level_free < LEVEL_COVERAGE:
+                    # go to next level
+                    # wall.next_level()
+
             else:
                 print('smaller stone without intersection')
                 print(stone_index_small, res.position, res.value)
@@ -141,4 +148,4 @@ m, s = divmod(stop-start, 60)
 print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
 
 
-wall.replay(fireflies=True, save=FILENAME)
+wall.replay(fireflies=False, save=FILENAME)

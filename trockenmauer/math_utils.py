@@ -57,6 +57,8 @@ class Translation(Transformation):
         :param n_dim: Number of dimensions
         """
         super().__init__(n_dim)
+        self.tran_mat = translation  # compatibility with RotationTranslation
+
         self._translation = translation
 
         self._build_hom_transf_matrix()
@@ -81,6 +83,8 @@ class Rotation(Transformation):
         :param n_dim: Number of dimensions
         """
         super().__init__(n_dim)
+        self.rot_mat = rotation  # compatibility with RotationTranslation
+
         self._rotation = rotation
         self._center = center
 
@@ -118,6 +122,8 @@ class RotationTranslation(Transformation):
         :param n_dim: Number of dimensions
         """
         super().__init__(n_dim)
+        self.rot_mat = rotation
+        self.tran_mat = translation  # compatibility with RotationTranslation
         # Rotation
         self._rotation = Rotation(rotation=rotation, center=center, n_dim=self.n_dim)
         self._translation = Translation(translation=translation, n_dim=self.n_dim)

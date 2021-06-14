@@ -3,21 +3,22 @@
 # Stefan Hochuli, 25.02.2021, utils.py
 #
 
-from typing import TYPE_CHECKING, Union, List
+from typing import TYPE_CHECKING, Union, List, Tuple, Optional
+
+import numpy as np
 
 from .stone import Geometry, Stone, Boundary, Intersection
-from .math_utils import RZ_90, Rotation
+from .math_utils import RZ_90
 
 if TYPE_CHECKING:
     from pymesh import Mesh
 
 
 def pick_smaller_stone(invalid_stone: 'Stone', stones: List['Stone'],
-                       overlapping_area: float, keep: str = 'width') -> int:
+                       overlapping_area: float, keep: str = 'width') -> Tuple[Optional[int], 'np.ndarray']:
     # return the index to the list of stones for the smaller stone
     # stones are ordered by their volume or area --> the first match is good
-    if overlapping_area > 0.00001:
-        print('!!! overlappping area false', overlapping_area)
+
     rotate = False
     if keep == 'width':
         # same width -> reduce length
@@ -45,13 +46,16 @@ def pick_smaller_stone(invalid_stone: 'Stone', stones: List['Stone'],
         match = next(s for s in stones if s.length < target_l and s.width < target_w)
     except StopIteration:
         print('no smaller stone in the list')
-        return None
+        return None, invalid_stone.current_rotation
     # Todo: rotate, if not initial fireflies try both
     if rotate:
-        # match.transform(Rotation(RZ_90))
-        pass
+        # rotation matrix from origin position to the target rotation (given: relative to the big stone)
+        rotation = RZ_90 @ invalid_stone.current_rotation
+        print('!!!\nrotate the smaller stone (relative to the original stone)\n!!!')
+    else:
+        rotation = invalid_stone.current_rotation
 
-    return stones.index(match)
+    return stones.index(match), rotation
 
 
 def load_from_pymesh(geom_type: str, mesh: 'Mesh', name: str = None

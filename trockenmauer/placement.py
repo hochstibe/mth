@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Union, Iterable
 import numpy as np
 
 from .firefly import FireflyProblem
+from .math_utils import RZ_90, RotationTranslation
 
 if TYPE_CHECKING:
     from . import Wall, Stone, Validator
@@ -27,6 +28,26 @@ def solve_placement(wall: 'Wall', stone: 'Stone', n_fireflies: Union[int, np.nda
     stone.position_history = history
     # print(fitness, xyz)
     return res
+
+
+def corner_placement(wall: 'Wall', corner='left'):
+    stone = wall.normal_stones[0]
+    bnd = wall.boundary
+    lim = stone.aabb_limits
+    # 90° Rotation around z-axis, translation to a corner of the wall
+    if corner == 'left':
+        t = np.array([lim[1][1],
+                      lim[1][0] + lim[1][2] * bnd.batter,
+                      -stone.bottom_center[2]])
+    elif corner == 'right':
+        t = np.array([bnd.x - lim[1][1],
+                      bnd.y - lim[1][0] - lim[1][2] * bnd.batter,
+                      -stone.bottom_center[2]])
+    else:
+        raise ValueError
+    stone.transform(RotationTranslation(rotation=RZ_90, center=np.zeros(3), translation=t))
+    wall.add_stone(stone)
+    wall.normal_stones.pop(0)
 
 
 def random_xy_on_current_building_level(wall: 'Wall',

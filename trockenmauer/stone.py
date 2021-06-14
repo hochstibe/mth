@@ -10,7 +10,7 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import pymesh
 
-from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Transformation, tetra_volume
+from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Rotation, Transformation, tetra_volume
 
 if TYPE_CHECKING:
     from .firefly import Iteration, Firefly
@@ -266,6 +266,7 @@ class Stone(Geometry):
     eigenvalue: np.ndarray = None
     eigenvector: np.ndarray = None  # (3, 3) !!! vectors as column vectors !!!
     center: np.ndarray = None
+    current_rotation: np.ndarray = np.eye(3)  # center + rotation --> transformation to original position possible
 
     # faces of the stone and their properties
     bottom: np.ndarray = None  # vertices of the bottom face
@@ -422,14 +423,6 @@ class Stone(Geometry):
 
         return pca(vertices.T)
 
-    # def transform2origin(self):
-    #     # Transforms the stone to the original position
-    #     order = np.argsort(self.eigenvalue)[::-1]  # decreasing from strongest to weakest
-    #     r = rot_matrix(self.eigenvector, order=order)
-    #     t = RotationTranslation(rotation=r, center=self.center, translation=-self.center)
-    #     self.transform(t)
-
-
     def transform(self, transformation: Transformation):
         """
         Transforms the vertices (``self.vertices``)
@@ -437,6 +430,8 @@ class Stone(Geometry):
         :param transformation: Transformation object including the transformation matrix
         :return: Updates the vertices and all properties
         """
+        if isinstance(transformation, (Rotation, RotationTranslation)):
+            self.current_rotation = transformation.rot_mat @ self.current_rotation
         # c_1 = self.bottom_center
         v = transformation.transform(self.mesh.vertices.T)
         # Rewrite mesh (not possible to update?)
