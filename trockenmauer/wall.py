@@ -92,6 +92,7 @@ class Wall:
         if stone.best_firefly and stone.best_firefly.validation_result.intersection:
             # stone intersects, don't add to tree
             stone.color = invalid_color
+            stone.alpha = .1
         else:
             # valid stone
             self.stones.append(stone)
@@ -119,6 +120,26 @@ class Wall:
             return True
         else:
             return False
+
+    def next_level(self):
+        # set h_max to the highest placed stone
+        h_min_old = self.level_h[self.level][0]
+        h_max_old = np.max([stone.aabb_limits[1][2] for stone in self.stones])
+        print(f'level {self.level}: {self.level_h[self.level]} min {h_min_old}, max {h_max_old}')
+        # if no stone was placed on the previous level, no updating is needed
+        if np.all(h_max_old == h_min_old):
+            print('  !!! no stone placed on the current level - remove the biggest stone')
+            self.normal_stones.pop(0)
+        else:
+            # set a new level
+            self.level_h[self.level][1] = h_max_old
+            print(f'  level {self.level}: {self.level_h[self.level]}')
+            # new level
+            self.level += 1
+            h_min_new = h_max_old
+            h_max_new = h_max_old + np.max([stone.aabb_limits[1][2] for stone in self.normal_stones])
+            self.level_h.append([h_min_new, h_max_new])
+            print(f'new level {self.level}: {self.level_h[self.level]}')
 
     def _init(self):
         """

@@ -19,17 +19,17 @@ from trockenmauer.placement import solve_placement, random_xy_on_current_buildin
 
 
 STONES = 20  # available stones
-STONES_LIM = 10  # number of (normal) stones to place
+STONES_LIM = 4  # number of (normal) stones to place
 FIREFLIES = 5
 ITERATIONS = 5
 FILENAME = None
 SEED = None
-LEVEL_COVERAGE = 0.25
+LEVEL_COVERAGE = 0.5
 # FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
 # random generator for comparable results
 random = np.random.default_rng(SEED)
-boundary = Boundary(x=1, y=.5, z=1, batter=.1)
+boundary = Boundary(x=.5, y=.5, z=1, batter=.1)
 wall = Wall(boundary)
 
 validator = ValidatorNormal(intersection_boundary=True, intersection_stones=True,
@@ -51,7 +51,11 @@ start = time()
 placed_stones = 2
 invalid_level_counter = 0
 # for i in range(15):
-while placed_stones < 9 and wall.normal_stones:
+while placed_stones < STONES_LIM and wall.normal_stones:
+
+    if invalid_level_counter > 3 or wall.level_free < LEVEL_COVERAGE:
+        # go to next level
+        wall.next_level()
     # print(f'stone {placed_stones} -----------------------------')
     # Pick the stones from biggest to smallest -> pick one of the 25% biggest stones
     stone_index = random.integers(0, np.max((1, np.round(len(wall.normal_stones)/4))))
@@ -89,7 +93,7 @@ while placed_stones < 9 and wall.normal_stones:
         if not stone_index_small:  # no smaller stone available
             print('no smaller stone available -> filler? -> next level?')
             invalid_level_counter += 1
-            wall.normal_stones.pop(stone_index)
+            # wall.normal_stones.pop(stone_index)
         else:
             stone = copy(wall.normal_stones[stone_index_small])
             stone.transform(Rotation(rot))
@@ -104,10 +108,6 @@ while placed_stones < 9 and wall.normal_stones:
                 # print('original stone removed')
                 # wall.normal_stones.pop(stone_index)
                 invalid_level_counter += 1
-
-                # if invalid_level_counter > 3 or wall.level_free < LEVEL_COVERAGE:
-                    # go to next level
-                    # wall.next_level()
 
             else:
                 print('smaller stone without intersection')

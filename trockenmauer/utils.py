@@ -51,7 +51,6 @@ def pick_smaller_stone(invalid_stone: 'Stone', stones: List['Stone'],
     if rotate:
         # rotation matrix from origin position to the target rotation (given: relative to the big stone)
         rotation = RZ_90 @ invalid_stone.current_rotation
-        print('!!!\nrotate the smaller stone (relative to the original stone)\n!!!')
     else:
         rotation = invalid_stone.current_rotation
 

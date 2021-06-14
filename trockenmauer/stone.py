@@ -36,6 +36,7 @@ class Geometry:
 
     # visualization
     color: str = 'gray'
+    alpha: float = .5
 
     def __init__(self, mesh: 'pymesh.Mesh' = None, name: str = None):
         self.name = name
@@ -128,12 +129,12 @@ class Geometry:
 
         return np.array([overlap_min, overlap_max])
 
-    def add_shape_to_ax(self, ax):  # , color='red'):
+    def add_shape_to_ax(self, ax):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
         ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
-                  color=self.color, marker='.', markersize=1)
+                  color=self.color, alpha=self.alpha, marker='.', markersize=.25)
         # triangulation
-        col = Poly3DCollection(self.triangles_values, linewidths=1, edgecolors=self.color, alpha=.1)
+        col = Poly3DCollection(self.triangles_values, linewidths=.25, edgecolors=self.color, alpha=self.alpha)
         col.set_facecolor(self.color)
         ax.add_collection3d(col)
 
@@ -182,6 +183,7 @@ class Boundary(Geometry):
         """
         super().__init__(name=name)
         self.color = 'grey'
+        self.alpha = .1
         self.x = x
         self.y = y
         self.z = z
