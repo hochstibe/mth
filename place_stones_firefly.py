@@ -18,19 +18,19 @@ from trockenmauer.validation import ValidatorNormal, ValidatorFill
 from trockenmauer.placement import solve_placement, random_xy_on_current_building_level, corner_placement, find_random_placement
 
 
-STONES = 20  # available stones
+STONES = 40  # available stones
 STONES_FILL = 5
-STONES_LIM = 10  # number of (normal) stones to place
+STONES_LIM = 30  # number of (normal) stones to place
 FIREFLIES = 20
 ITERATIONS = 20
 FILENAME = None
 SEED = None
 LEVEL_COVERAGE = 0.25
-# FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
+FILENAME = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}_{STONES}_stones_{FIREFLIES}_{ITERATIONS}_iterations'
 
 # random generator for comparable results
 random = np.random.default_rng(SEED)
-boundary = Boundary(x=1, y=.5, z=.5, batter=.1)
+boundary = Boundary(x=1., y=.5, z=.5, batter=.1)
 wall = Wall(boundary)
 
 validator_n = ValidatorNormal(intersection_boundary=True, intersection_stones=True,
@@ -120,6 +120,7 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
                 print(stone_index_small, res.position, res.value)
                 t = Translation(translation=res.position - stone.bottom_center)
                 stone.transform(transformation=t)
+                stone.alpha = 1
                 wall.add_stone(stone)
                 wall.normal_stones.pop(stone_index_small)
                 placed_stones += 1
@@ -141,6 +142,7 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
             # Translate the stone to the optimal position and add to the wall
             # t = Translation(translation=res.position - stone.bottom_center)
             # stone.transform(transformation=t)
+            stone.alpha = 1
             wall.add_stone(stone)
             wall.normal_stones.pop(stone_index)
             placed_stones += 1
@@ -151,7 +153,7 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
 
     # stopping criteria for building on the current level and building the wall in general
     if invalid_level_counter >= 3 or wall.level_free < LEVEL_COVERAGE or not wall.normal_stones:
-        print(f'------------- place filling stones --- {invalid_level_counter} {wall.level_free} ---------------------')
+        """print(f'------------- place filling stones --- {invalid_level_counter} {wall.level_free} ---------------------')
         # filling stones
         invalid_level_counter = 0
         valid_counter = 0
@@ -180,7 +182,7 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
                 stone.color = 'lime'
                 wall.add_stone(stone)
                 wall.filling_stones.pop(stone_index)
-
+        """
         # go to next level or
         running = wall.next_level()
         invalid_counter = 0
@@ -190,6 +192,13 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
     wall.normal_stones.pop(stone_index)
     placed_stones += 1
     """
+
+wall_vol = wall.boundary.volume / wall.boundary.z * np.max([stone.aabb_limits[1][2] for stone in wall.stones])
+print(f'Wall Volume: {wall.boundary.volume} {wall_vol}')
+stone_vol = np.sum([stone.aabb_volume for stone in wall.stones])
+print(f'{len(wall.stones)} Stones Volume: {stone_vol}')
+print(stone_vol / wall.boundary.volume, stone_vol / wall_vol)
+
 
 # Stop criteria
 stop = time()

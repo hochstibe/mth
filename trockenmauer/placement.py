@@ -46,6 +46,7 @@ def corner_placement(wall: 'Wall', corner='left'):
     else:
         raise ValueError
     stone.transform(RotationTranslation(rotation=RZ_90, center=np.zeros(3), translation=t))
+    stone.alpha = 1
     wall.add_stone(stone)
     wall.normal_stones.pop(0)
 

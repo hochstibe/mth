@@ -21,12 +21,14 @@ def rz(phi):
     return np.array([[np.cos(phi), -np.sin(phi), 0], [np.sin(phi), np.cos(phi), 0], [0, 0, 1]])
 
 
-stones = [generate_regular_stone((.15, .4), (.1, .2), (.5, .15)) for _ in range(10)]
+stones = [generate_regular_stone((.1, .3), (.075, .2), (.05, .15)) for _ in range(15)]
 
 # order them by volume
 stones.sort(key=lambda x: x.aabb_volume, reverse=True)
 print([stone.aabb_area for stone in stones])
 print([(stone.length, stone.width) for stone in stones])
+
+stone_volume = np.sum([])
 
 # add a rotation attribute
 stone = stones[0]

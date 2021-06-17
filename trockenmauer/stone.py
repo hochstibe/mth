@@ -134,7 +134,7 @@ class Geometry:
         ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
                   color=self.color, alpha=self.alpha, marker='.', markersize=.25)
         # triangulation
-        col = Poly3DCollection(self.triangles_values, linewidths=.25, edgecolors=self.color, alpha=self.alpha)
+        col = Poly3DCollection(self.triangles_values, linewidths=.25, edgecolors='black', alpha=self.alpha)
         col.set_facecolor(self.color)
         ax.add_collection3d(col)
 
@@ -188,6 +188,7 @@ class Boundary(Geometry):
         self.y = y
         self.z = z
         self.batter = batter
+        self.volume = x * (y + y - 2*y*batter)/2 *z
 
         ba = self.batter * self.z
 
