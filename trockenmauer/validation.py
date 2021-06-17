@@ -134,7 +134,8 @@ class Validator:
         return bb_vol - vol_inter
 
     @staticmethod
-    def _closest_stone(stone: 'Stone', wall: 'Wall'):
+    def _closest_stone(stone: 'Stone', wall: 'Wall', num: int = 1) -> List[float]:
+        # get the list of distances to the closest stones for num stones
 
         hits = wall.r_tree.nearest(stone.aabb_limits.flatten(), num_results=5, objects=True)
 
@@ -150,9 +151,20 @@ class Validator:
                 shortest_distances.append(d)
 
         if shortest_distances:
-            return shortest_distances[0]
+            return shortest_distances[:num]
         else:
-            return 0.
+            return [0., ]
+
+    @staticmethod
+    def stone_on_level(stone: 'Stone', wall: 'Wall'):
+        # If the stone is on the current building level or lower
+        level = wall.get_stone_level(stone)
+        # print(f'  {level}, {wall.level}, {level <= wall.level}')
+        if level <= wall.level:
+            on_level = True
+        else:
+            on_level = False
+        return on_level
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
@@ -196,7 +208,8 @@ class Validator:
 class ValidatorNormal(Validator):
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
-                 distance2boundary=False, volume_below_stone=False, distance2closest_stone=False):
+                 distance2boundary=False, volume_below_stone=False, distance2closest_stone=False,
+                 on_level=False):
         """
         The parameters control, witch validations will be executed
 
@@ -211,6 +224,7 @@ class ValidatorNormal(Validator):
         self.distance2boundary = distance2boundary
         self.volume_below_stone = volume_below_stone
         self.distance2closest_stone = distance2closest_stone
+        self.on_level = on_level
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
         """
@@ -247,7 +261,10 @@ class ValidatorNormal(Validator):
             results.volume_below_stone = v
 
         if self.distance2closest_stone:
-            results.distance2closest_stone = self._closest_stone(stone, wall)
+            results.distance2closest_stone = self._closest_stone(stone, wall, 1)
+
+        if self.on_level:
+            results.on_level = self.stone_on_level(stone, wall)
 
         return passed, results
 
@@ -286,38 +303,100 @@ class ValidatorNormal(Validator):
         # distance to the closest stone on the same level
         if self.distance2closest_stone:
             # no penalty, if there is no stone on the same level
-            score += 5 * res.distance2closest_stone
+            score += 5 * res.distance2closest_stone[0]
 
-        # Punish stones that are not on the current level
-        if not wall.in_current_level(stone):
+        # Punish stones that are not on the current level (or lower=
+        if not res.on_level:
             score += 2 + stone.aabb_limits[1][2]  # 2 +
         res.score = score
+
         return res
 
 
 class ValidatorFill(Validator):
 
-    def __init__(self):
+    def __init__(self, intersection_boundary=False, intersection_stones=False,
+                 volume_below_stone=False, distance2closest_stone=False,
+                 on_level=False):
+        """
+        The parameters control, witch validations will be executed
+
+        :param intersection_boundary: validate intersections with the boundary
+        :param intersection_stones: validate intersections with the previously placed stones
+        """
+        # Init tetgen from super()
         super().__init__()
+
+        self.intersection_boundary = intersection_boundary
+        self.intersection_stones = intersection_stones
+        self.volume_below_stone = volume_below_stone
+        self.distance2closest_stone = distance2closest_stone  # minimize distance to 2 stones
+        self.on_level = on_level
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
 
         passed = True
         results = ValidationResult()
 
+        if self.intersection_boundary:
+            intersects, details = self._intersection_boundary(stone, wall)
+            if intersects:
+                passed = False
+                results.intersection_boundary = details
+
+        if self.intersection_stones:
+            intersects, details = self._intersection_stones(stone, wall)
+            if intersects:
+                passed = False
+                results.intersection_stones = details
+
+        if self.volume_below_stone:
+            v = self._volume_below_stone(stone, wall)
+            results.volume_below_stone = v
+
+        if self.distance2closest_stone:
+            results.distance2closest_stone = self._closest_stone(stone, wall, 2)
+
+        if self.on_level:
+            results.on_level = self.stone_on_level(stone, wall)
+
         return passed, results
 
-    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> float:
+    def fitness(self, firefly: 'np.ndarray', stone: 'Stone', wall: 'Wall', **kwargs) -> 'ValidationResult':
 
         # move the bottom center of the stone to the given position
         t = Translation(translation=firefly - stone.bottom_center)
         stone.transform(transformation=t)
         passed, res = self.validate(stone, wall)
-        
-        if passed:
-            return 0
-        else:
-            return 1
+
+        # balance the separate terms:
+        # - volume: fraction of the volume of the stone [0-1]
+        # - distance2boundary: wall width: 0.5 -> max_distance ~ 0.2 -> d*5 -> [0-1]
+        # - volume below the stone
+        score = 0
+        # intersection volume
+        # if res.intersection:  # penalty any intersection with 1 and add 10* scaled volume
+        #     score += 1 + res.intersection_volume / stone.mesh_volume
+        if res.intersection_boundary:
+            score += .5 + res.intersection_volume_b / stone.mesh_volume
+        if res.intersection_stones:
+            score += 1 + res.intersection_volume_s / stone.mesh_volume
+
+        # free volume below the stone
+        if self.volume_below_stone:
+            score += res.volume_below_stone / stone.mesh_volume
+        # distance to the closest stone on the same level
+        if self.distance2closest_stone:
+            # no penalty, if there is no stone on the same level
+            for dist in res.distance2closest_stone:
+                score += (1 + 5 * dist)**2 - 1
+
+        # Punish stones that are not on the current level (or lower=
+        if not res.on_level:
+            score += 2 + stone.aabb_limits[1][2]  # 2 +
+        res.score = score
+
+        return res
 
 
 @dataclass
@@ -335,7 +414,8 @@ class ValidationResult:
     _intersection_volume_s: float = 0
     distance2boundary: float = 0  # minimal distance to the boundary
     volume_below_stone: float = 0  # total free volume below the stone
-    distance2closest_stone: float = 0
+    distance2closest_stone: List[float] = (0, )
+    on_level: bool = True
 
     score: float = 0
 

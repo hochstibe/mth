@@ -122,7 +122,7 @@ class Geometry:
         # difference is positive, if there is an overlap
         diff = overlap_max - overlap_min
 
-        if np.any(diff <= 0):
+        if np.any(diff <= 0):  # todo: ?
             # adjacent bb, the tree returns an overlap
             # print('No overlap, diff:', diff)
             return None
@@ -242,18 +242,6 @@ class Boundary(Geometry):
             [14, 15, 7], [14, 7, 6], [15, 12, 4], [15, 4, 7],  # top
         ])
         self.mesh_solid_sides = pymesh.form_mesh(vertices, triangles_index)
-
-    def add_shape_to_ax(self, ax):  # , color='grey'):
-        """
-        Adds the boundaries to the plot
-
-        :param ax:
-        :param color: color for the plot, e.g. 'g', 'r', 'green'
-        :return:
-        """
-        # Default color is different than from Geometry.add_shape_to_ax()
-        # Todo: pass kwargs for setting the Poly3DCollection attributes
-        super().add_shape_to_ax(ax)  # , color)
 
     def __repr__(self):
         return f'<Boundary(vertices=array([{(self.mesh.vertices[:2])}, ...])>'
@@ -441,26 +429,6 @@ class Stone(Geometry):
         # self.mesh.vertices = v.T
         self._update_mesh_properties()
         # print(self.name, 'from',  np.round(c_1, 5), 'to', np.round(self.bottom_center, 5))
-
-    def add_shape_to_ax(self, ax):  # , color: str = 'green'):
-        """
-        Adds the shape of the stone (triangles) to the plot
-
-        :param ax: pyplot axis
-        :param color: color for the plot, e.g. 'g', 'r', 'green'
-        :return: -
-        """
-        super().add_shape_to_ax(ax)  # , color)
-
-        # Plot the points
-        # ax.plot3D(self.mesh.vertices[:, 0], self.mesh.vertices[:, 1], self.mesh.vertices[:, 2],
-        #           color=color, marker='.', markersize=1)
-        # # Plot the triangles
-        # col = Poly3DCollection(self.triangles_values, linewidths=0.4, edgecolors=color, alpha=.2)
-        # col.set_facecolor(color)
-        # ax.add_collection3d(col)
-
-        # set_axes_equal(ax)
 
     def add_labels_to_ax(self, ax, positive_eigenvec=False):
         """

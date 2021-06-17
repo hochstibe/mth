@@ -155,11 +155,11 @@ def xy_fixed_z(xyz: np.ndarray, wall: 'Wall', **kwargs):
     return xyz
 
 
-def find_random_placement(wall: 'Wall', random: 'np.random.Generator' = np.random.default_rng()):
+def find_random_placement(wall: 'Wall', random: 'np.random.Generator' = np.random.default_rng(), z: float = 0):
     # Find a placement within the given area of the wall
 
     x = random.uniform(0, wall.boundary.x)
-    y = random.uniform(0, wall.boundary.y)
+    y = random.uniform(z * wall.boundary.batter, wall.boundary.y - z * wall.boundary.batter)
     z = 0.001  # on the ground (1mm above for cleaner intersections
 
     for stone in wall.stones:

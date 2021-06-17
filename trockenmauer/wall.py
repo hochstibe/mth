@@ -31,6 +31,7 @@ class Wall:
 
     # List of available stones
     normal_stones: List['Stone'] = []
+    filling_stones: List['Stone'] = []
 
     # The wall is built in levels: the algorithm tries to build one level after another
     level: int = 0  # enumeration (index) of the current building level
@@ -100,29 +101,25 @@ class Wall:
             # Add the BB to the tree, the name of the stone is the index in the stones-list
             self.r_tree.insert(i, stone.aabb_limits.flatten())
 
-            h_min, h_max = self.level_h[self.level]
-            if self.in_current_level(stone):
-                # update h_max
-                # on the current level, set h_max of the current level (could increase a bit)
-                if h_max < stone.aabb_limits[1][2]:
-                    print('update current level-limits from', stone.aabb_limits[1][2], 'to', h_max)
-                self.level_h[self.level] = [h_min, np.max([h_max, stone.aabb_limits[1][2]])]
-                # print('stone on the current level, update the limits')
-
+            level = self.get_stone_level(stone)
+            if level and level == self.level:
                 # update the free area
                 self.level_free -= stone.aabb_area / self.level_area
 
-    def in_current_level(self, stone: 'Stone') -> bool:
-        h_min, h_max = self.level_h[self.level]
-        # if stone.aabb_limits[1][2] < h_max + (h_max - h_min) / 3:
-        if stone.aabb_limits[1][2] <= h_max:
-            # on the current level
-            return True
+    def get_stone_level(self, stone: 'Stone') -> Optional[int]:
+        # Get the index of the current level
+        # returns None, if no matching level found (above)
+        z = stone.aabb_limits[1][2]
+        limits = [lim for lim in self.level_h if lim[0] < z <= lim[1]]
+        if limits:
+            # print('get_stone_level', self.level_h[self.level], limits, self.level_h.index(limits[0]))
+            return self.level_h.index(limits[0])
         else:
-            return False
+            return True
 
-    def next_level(self):
+    def next_level(self) -> bool:
         # set h_max to the highest placed stone
+        # returns True, while h_max is lower than the wall's limits
         h_min_old = self.level_h[self.level][0]
         h_max_old = np.max([stone.aabb_limits[1][2] for stone in self.stones])
         print(f'level {self.level}: {self.level_h[self.level]} min {h_min_old}, max {h_max_old}')
@@ -138,8 +135,13 @@ class Wall:
             self.level += 1
             h_min_new = h_max_old
             h_max_new = h_max_old + np.max([stone.aabb_limits[1][2] for stone in self.normal_stones])
+            if h_max_new > self.boundary.z:
+                print('Top of the wall reached')
+                return False
             self.level_h.append([h_min_new, h_max_new])
             print(f'new level {self.level}: {self.level_h[self.level]}')
+
+        return True
 
     def _init(self):
         """
