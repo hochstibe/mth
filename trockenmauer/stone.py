@@ -286,7 +286,7 @@ class Stone(Geometry):
         :param name: optional name for a stone
         """
         super().__init__()
-        self.color = 'green'
+        self.color = 'lime'
 
         if name:
             self.name = name
@@ -479,3 +479,17 @@ class Stone(Geometry):
 
     def __repr__(self):
         return f'<Stone(name={self.name}, vertices={len(self.mesh.vertices)})>'
+
+
+class NormalStone(Stone):
+    def __init__(self, vertices: np.ndarray,
+                 triangles_index: np.ndarray = None, name: str = None):
+        super().__init__(vertices, triangles_index, name)
+        self.color = 'green'
+
+
+class FillingStone(Stone):
+    def __init__(self, vertices: np.ndarray,
+                 triangles_index: np.ndarray = None, name: str = None):
+        super().__init__(vertices, triangles_index, name)
+        self.color = 'blue'

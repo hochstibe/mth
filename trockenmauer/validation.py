@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 import pymesh
 
-from .stone import Intersection
+from .stone import Intersection, NormalStone
 from .math_utils import Translation
 
 if TYPE_CHECKING:
@@ -43,6 +43,13 @@ class Validator:
 
     @staticmethod
     def _bb_intersections(wall: 'Wall', bb: 'np.ndarray') -> List['Intersection']:
+        """
+        Intersects a bounding box ((2, 3) with the bounding boxes within the tree
+
+        :param wall: Boundary object
+        :param bb: Bounding box to intersect
+        :return: Status: True (there is an intersection) / False (no intersection; intersection mesh
+        """
 
         hits = wall.r_tree.intersection(bb.flatten(), objects=False)  # -> list of indices in index
 
@@ -56,12 +63,18 @@ class Validator:
 
     @staticmethod
     def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> Union[None, 'pymesh.Mesh']:
+        """
+        Intersects a mesh with another mesh
+
+        :param mesh1: first mesh
+        :param mesh2: second mesh
+        :return: intersecting mesh or None
+        """
         # engine: igl (auto) fails on empty intersection, cgal requires closed meshes
         # cork always works, but is more experimental
         try:
             intersection = pymesh.boolean(mesh1, mesh2, "intersection", engine='cgal')
-        except RuntimeError as err:
-            # print(err)
+        except RuntimeError:
             intersection = None
 
         return intersection
@@ -95,7 +108,7 @@ class Validator:
 
         :param stone: Stone object
         :param wall: Wall object with the mesh of all previously placed stones
-        :return:
+        :return: Status, List of intersection objects
         """
         # Todo: at the moment: only intersect the bounding boxes
         if not wall.stones:
@@ -112,15 +125,36 @@ class Validator:
 
     @staticmethod
     def _distance2mesh(points: np.ndarray, mesh: 'pymesh.Mesh') -> List:
+        """
+        Calculates the shortest distances from a set of points to a mesh
+        
+        :param points: Set of points (n, 3)
+        :param mesh: mesh
+        :return: list of squared distances
+        """
         # for each point: [squared distance, closest face, closest point]
         distances, faces, closest_points = pymesh.distance_to_mesh(mesh, points, engine='cgal')
         return distances
 
-    def _min_distance2boundary(self, stone: 'Stone', boundary: 'Boundary'):
+    def _min_distance2boundary(self, stone: 'Stone', boundary: 'Boundary') -> float:
+        """
+        Calculates the minimal distance to the boundary
+
+        :param stone: stone object
+        :param boundary: boundary object
+        :return: minimal distance
+        """
         distances = self._distance2mesh(stone.sides_center, boundary.mesh_solid_sides)
         return np.sqrt(np.min(distances))
 
-    def _volume_below_stone(self, stone: 'Stone', wall: 'Wall'):
+    def _volume_below_stone(self, stone: 'Stone', wall: 'Wall') -> float:
+        """
+        Calculates the empty volume below the stone
+
+        :param stone: stone object
+        :param wall: wall objects with the already placed stones
+        :return: volume
+        """
         # Approximation with bounding box -> with mesh, it is harder to have the outer hull footprint
         # bounding box of the volume below the stone
         # [[1, 2, 3], [4, 5, 6]] -> [[1, 2, 0], [4, 5, 3]]
@@ -134,29 +168,70 @@ class Validator:
         return bb_vol - vol_inter
 
     @staticmethod
-    def _closest_stone(stone: 'Stone', wall: 'Wall', num: int = 1) -> List[float]:
+    def _closest_stone(stone: 'Stone', wall: 'Wall', n: int = 1) -> List['Stone']:
+        """
+        Calculates the n closest stones on the same height or higher
+        (other stone z_max is higher than new stone's z_min)
+
+        :param stone: new stone object
+        :param wall: wall objects with the already placed stones
+        :return: list with stones
+        """
+        hits = wall.r_tree.nearest(stone.aabb_limits.flatten(), num_results=np.min([2*n, 5]), objects=False)
+
+        # upper corner of the hit has to be higher than the stones lower corner
+        # only use stones on the same level or higher
+        shortest_stones = [wall.stones[i] for i in hits if wall.stones[i].aabb_limits[1, 2] > stone.aabb_limits[0, 2]]
+
+        return shortest_stones
+
+    def _distance2closest_stone(self, stone: 'Stone', wall: 'Wall', n: int = 1) -> List[float]:
+        """
+        Calculates the distances to n closest stones on the same height
+        (other stone z_max is higher than new stone's z_min)
+
+        :param stone: new stone object
+        :param wall: wall objects with the already placed stones
+        :return: list with distances
+        """
         # get the list of distances to the closest stones for num stones
+        shortest_stones = self._closest_stone(stone, wall, n)
 
-        hits = wall.r_tree.nearest(stone.aabb_limits.flatten(), num_results=5, objects=True)
+        shortest_distances = []
+        for hit in shortest_stones:
+            overlap_min = np.max(np.array([stone.aabb_limits[0], hit.aabb_limits[0]]), axis=0)
+            overlap_max = np.min(np.array([stone.aabb_limits[1], hit.aabb_limits[1]]), axis=0)
+            diff = overlap_max - overlap_min
+            d = np.linalg.norm(diff[diff <= 0])
+            # negative --> in this direction is the shortest distance
+            shortest_distances.append(d)
 
-        shortest_distances = list()
-        for h in hits:
-            # upper corner of the hit has to be higher than the stones lower corner
-            if h.bbox[-1] > stone.aabb_limits[0, 2]:  # only use stones on the same level or higher
-                overlap_min = np.max(np.array([stone.aabb_limits[0], h.bbox[:3]]), axis=0)
-                overlap_max = np.min(np.array([stone.aabb_limits[1], h.bbox[3:]]), axis=0)
-                diff = overlap_max - overlap_min
-                d = np.linalg.norm(diff[diff <= 0])
-                # negative --> in this direction is the shortest distance
-                shortest_distances.append(d)
+        # hits = wall.r_tree.nearest(stone.aabb_limits.flatten(), num_results=4*n, objects=True)
+        # shortest_distances = list()
+        # for h in hits:
+        #     # upper corner of the hit has to be higher than the stones lower corner
+        #     if h.bbox[-1] > stone.aabb_limits[0, 2]:  # only use stones on the same level or higher
+        #         overlap_min = np.max(np.array([stone.aabb_limits[0], h.bbox[:3]]), axis=0)
+        #         overlap_max = np.min(np.array([stone.aabb_limits[1], h.bbox[3:]]), axis=0)
+        #         diff = overlap_max - overlap_min
+        #         d = np.linalg.norm(diff[diff <= 0])
+        #         # negative --> in this direction is the shortest distance
+        #         shortest_distances.append(d)
 
         if shortest_distances:
-            return shortest_distances[:num]
+            return shortest_distances[:n]
         else:
             return [0., ]
 
     @staticmethod
-    def stone_on_level(stone: 'Stone', wall: 'Wall'):
+    def _stone_on_level(stone: 'Stone', wall: 'Wall') -> bool:
+        """
+        Checks, if the stone is on the current building level or lower
+
+        :param stone: new stone object
+        :param wall: wall objects with the already placed stones
+        :return: True, if on the current level or lower
+        """
         # If the stone is on the current building level or lower
         level = wall.get_stone_level(stone)
         # print(f'  {level}, {wall.level}, {level <= wall.level}')
@@ -261,10 +336,10 @@ class ValidatorNormal(Validator):
             results.volume_below_stone = v
 
         if self.distance2closest_stone:
-            results.distance2closest_stone = self._closest_stone(stone, wall, 1)
+            results.distance2closest_stone = self._distance2closest_stone(stone, wall, 1)
 
         if self.on_level:
-            results.on_level = self.stone_on_level(stone, wall)
+            results.on_level = self._stone_on_level(stone, wall)
 
         return passed, results
 
@@ -317,7 +392,7 @@ class ValidatorFill(Validator):
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
                  volume_below_stone=False, distance2closest_stone=False,
-                 on_level=False):
+                 on_level=False, delta_h=False):
         """
         The parameters control, witch validations will be executed
 
@@ -332,6 +407,22 @@ class ValidatorFill(Validator):
         self.volume_below_stone = volume_below_stone
         self.distance2closest_stone = distance2closest_stone  # minimize distance to 2 stones
         self.on_level = on_level
+        self.delta_h = delta_h
+        
+    def _h_closest_normal_stone(self, stone: 'Stone', wall: 'Wall') -> float:
+        # Get the height difference to the closest normal stone
+        # Higher than the stone -> bad
+        # lower than the stone -> ok, but equal height would be best
+        close_st = self._distance2closest_stone(stone, wall, 5)
+        normal_stones = [st for st in close_st if isinstance(st, NormalStone)]
+
+        if normal_stones:
+            delta_h = normal_stones[0].aabb_limits[1, 2] - stone.aabb_limits[1, 2]
+        else:
+            print('!!! NO CLOSE NORMAL STONE FOUND !!!', len([st.__class__.__name__ for st in close_st]), len(close_st), len(normal_stones))
+            delta_h = 0
+
+        return delta_h
 
     def validate(self, stone: 'Stone', wall: 'Wall') -> Tuple[bool, 'ValidationResult']:
 
@@ -355,10 +446,14 @@ class ValidatorFill(Validator):
             results.volume_below_stone = v
 
         if self.distance2closest_stone:
-            results.distance2closest_stone = self._closest_stone(stone, wall, 2)
+            results.distance2closest_stone = self._distance2closest_stone(stone, wall, 2)
 
         if self.on_level:
-            results.on_level = self.stone_on_level(stone, wall)
+            # Needed?
+            results.on_level = self._stone_on_level(stone, wall)
+
+        if self.delta_h:
+            results.delta_h = self._h_closest_normal_stone(stone, wall)
 
         return passed, results
 
@@ -392,9 +487,15 @@ class ValidatorFill(Validator):
                 score += (1 + 5 * dist)**2 - 1
 
         # Punish stones that are not on the current level (or lower=
-        if not res.on_level:
-            score += 2 + stone.aabb_limits[1][2]  # 2 +
-        res.score = score
+        # if not res.on_level:
+        #     score += 2 + stone.aabb_limits[1][2]  # 2 +
+        # res.score = score
+
+        if self.delta_h:
+            if res.delta_h < 0:  # new stone is higher than the closest normal stone
+                res.score += 2
+            else:
+                res.score += res.delta_h*10
 
         return res
 
@@ -416,6 +517,7 @@ class ValidationResult:
     volume_below_stone: float = 0  # total free volume below the stone
     distance2closest_stone: List[float] = (0, )
     on_level: bool = True
+    delta_h: float = 0
 
     score: float = 0
 

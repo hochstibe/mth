@@ -6,8 +6,7 @@ from typing import List, Tuple, Optional, TYPE_CHECKING
 from pathlib import Path
 import time
 
-import pymesh
-from rtree import index
+import rtree.index
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 from mpl_toolkits.mplot3d import Axes3D
@@ -15,6 +14,7 @@ import numpy as np
 
 from .plot import set_axes_equal
 from .generate_stones import generate_regular_stone
+from . import NormalStone
 
 if TYPE_CHECKING:
     from . import Stone, Boundary
@@ -24,8 +24,8 @@ class Wall:
     """
     A wall consists of the placed stones and the boundary.
     """
-    boundary: 'Boundary' = None
-    mesh: 'pymesh.Mesh' = None
+    boundary: 'Boundary'
+    # mesh: 'pymesh.Mesh' = None -> not needed (merging in pymesh connects the meshes
     stones: List['Stone'] = []    # List of placed stones Todo: Why [0, ]???
     stones_vis: List['Stone'] = []  # List of valid and invalid placed stones
 
@@ -33,21 +33,23 @@ class Wall:
     normal_stones: List['Stone'] = []
     filling_stones: List['Stone'] = []
 
+    r_tree: 'rtree.index.Index'  # The index of the aabb are the indices of wall.stones
+
     # The wall is built in levels: the algorithm tries to build one level after another
     level: int = 0  # enumeration (index) of the current building level
     level_h: List[List] = [[0, .1], ]  # List of [min z, max z] of the building levels
     level_free: float = 1  # ratio of free area on the current level
-    _level_area: float = None
+    _level_area: float = None  # total area on the current level (dependant o batter)
 
-    def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None, mesh: 'pymesh.Mesh' = None):
+    def __init__(self, boundary: 'Boundary', stones: List['Stone'] = None):  # , mesh: 'pymesh.Mesh' = None):
         self.boundary = boundary
         self.stones = stones
-        self.mesh = mesh
+        # self.mesh = mesh  -> not needed
 
         # Bounding Volume Hierarchy (axis aligned bounding boxes)
         # Use separate trees for different stone sizes (e.g. one for normal stones, one for filler stones)
-        p = index.Property(dimension=3)
-        self.r_tree = index.Index(properties=p)
+        p = rtree.index.Property(dimension=3)
+        self.r_tree = rtree.index.Index(properties=p)
 
         if not self.stones:
             self.stones = []
@@ -59,33 +61,49 @@ class Wall:
 
     def init_stones(self, n_normal_stones: int,  normal_x_range: Tuple[float, float],
                     normal_y_range: Tuple[float, float], normal_z_range: Tuple[float, float],
-                    random: 'np.random.Generator'):
+                    random: 'np.random.Generator', stone_type: str):
 
         # Generate and align stones to the coordinate axis
-        self.normal_stones = [generate_regular_stone(normal_x_range, normal_y_range, normal_z_range, random)
+        stones = [generate_regular_stone(normal_x_range, normal_y_range, normal_z_range, random, stone_type)
                               for _ in range(n_normal_stones)]
-        # Order by their volume
-        self.normal_stones.sort(key=lambda x: x.aabb_volume, reverse=True)
+        if stone_type.lower() == 'normal':
+            self.normal_stones = stones
+            # Order by their volume
+            self.normal_stones.sort(key=lambda x: x.aabb_volume, reverse=True)
+        elif stone_type.lower() == 'filling':
+            self.filling_stones = stones
+            # Order by their volume
+            self.filling_stones.sort(key=lambda x: x.aabb_volume, reverse=True)
+        else:
+            raise ValueError
 
         # the first level is up to the max height of the available stones
         self.level_h[0] = [0, np.max([stone.height for stone in self.normal_stones])]
 
     @property
     def level_area(self):
+        """
+        total area on the current level (dependant of batter)
+        """
         if not self._level_area:
             self._level_area = self.boundary.x * (self.boundary.y - 2*self.level_h[self.level][0]*self.boundary.batter)
         return self._level_area
 
     def add_stone(self, stone: 'Stone', invalid_color='red'):
+        """
+        Add a stone the the wall. If the stone intersects, it is only added vor visualization purposes
+
+        :param stone: new stone object
+        :param invalid_color: name of the color for an intersecting stone
+        """
         # Add the stone to the mesh
-        if not self.mesh:
-            self.mesh = stone.mesh
-        else:
-            # Merging the mesh
-            self.mesh = pymesh.merge_meshes([self.mesh, stone.mesh])
-            # self.mesh = pymesh.boolean(self.mesh, stone.mesh, 'union', engine='cgal')  # alternative to merge
-            # Todo: Merging separate meshes adds a connection. It would work, if all stones are adjacent
-            # -> for the moment, to check intersections, all individual stones have to be checked
+        # if not self.mesh:
+        #     self.mesh = stone.mesh
+        # else:
+        #     # Merging the mesh
+        #     # self.mesh = pymesh.merge_meshes([self.mesh, stone.mesh])
+        #     # self.mesh = pymesh.boolean(self.mesh, stone.mesh, 'union', engine='cgal')  # alternative to merge
+        #     # -> for the moment, to check intersections, all individual stones have to be checked
 
         # Add the stone to the list to keep track of the individual stones
         self.stones_vis.append(stone)
@@ -96,37 +114,53 @@ class Wall:
             stone.alpha = .1
         else:
             # valid stone
+            stone.alpha = 1
             self.stones.append(stone)
             i = len(self.stones) - 1  # index of the stone
             # Add the BB to the tree, the name of the stone is the index in the stones-list
             self.r_tree.insert(i, stone.aabb_limits.flatten())
 
             level = self.get_stone_level(stone)
-            if level and level == self.level:
-                # update the free area
+            if level == self.level and isinstance(stone, NormalStone):
+                # update the free area for the normal stones. Filling stones can be above other stones
+                # therefore, the area would be 2x subtracted
                 self.level_free -= stone.aabb_area / self.level_area
 
     def get_stone_level(self, stone: 'Stone') -> Optional[int]:
-        # Get the index of the current level
-        # returns None, if no matching level found (above)
+        """
+        Get the index of the building level for a (new) stone
+        :param stone: new stone object
+        """
+        # returns 999, if no matching level found (above)
         z = stone.aabb_limits[1][2]
         limits = [lim for lim in self.level_h if lim[0] < z <= lim[1]]
         if limits:
-            # print('get_stone_level', self.level_h[self.level], limits, self.level_h.index(limits[0]))
             return self.level_h.index(limits[0])
         else:
-            return True
+            return 999
 
-    def next_level(self) -> bool:
+    def next_level(self) -> int:
+        """
+        Calculate the boundaries of the current building level (z_max = highest stone).
+        Start a new building level. It returns a status code
+
+        :return: 0: New level started,
+                 1: No stone was placed on the current level, no new level started
+                 2: Top of the wall reached, no new level started
+        """
         # set h_max to the highest placed stone
         # returns True, while h_max is lower than the wall's limits
         h_min_old = self.level_h[self.level][0]
         h_max_old = np.max([stone.aabb_limits[1][2] for stone in self.stones])
         print(f'level {self.level}: {self.level_h[self.level]} min {h_min_old}, max {h_max_old}')
         # if no stone was placed on the previous level, no updating is needed
+        if len(self.normal_stones) == 0:
+            print('Top of the wall reached')
+            return 2
         if np.all(h_max_old == h_min_old):
             print('  !!! no stone placed on the current level - remove the biggest stone')
             self.normal_stones.pop(0)
+            return 1
         else:
             # set a new level
             self.level_h[self.level][1] = h_max_old
@@ -137,11 +171,11 @@ class Wall:
             h_max_new = h_max_old + np.max([stone.aabb_limits[1][2] for stone in self.normal_stones])
             if h_max_new > self.boundary.z:
                 print('Top of the wall reached')
-                return False
+                return 2
             self.level_h.append([h_min_new, h_max_new])
             print(f'new level {self.level}: {self.level_h[self.level]}')
 
-        return True
+        return 0
 
     def _init(self):
         """

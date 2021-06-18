@@ -7,13 +7,14 @@ from typing import Union, Tuple
 
 import numpy as np
 
-from .stone import Stone
+from . import Stone, NormalStone, FillingStone
 
 
 def generate_regular_stone(x: Union[Tuple[float, float], float],
                            y: Union[Tuple[float, float], float],
                            z: Union[Tuple[float, float], float],
                            random: 'np.random.Generator' = np.random.default_rng(),
+                           stone_type: 'str' = 'normal',
                            edge_noise: float = 0.3,
                            name: str = None) -> 'Stone':
     """
@@ -23,6 +24,7 @@ def generate_regular_stone(x: Union[Tuple[float, float], float],
     :param y: target length in y-direction or boundary (min, max)
     :param z: target length in z-direction or boundary (min, max)
     :param random: Generator for random numbers
+    :param stone_type: Type of the Stone: 'stone', 'normal', 'filling'
     :param edge_noise: uniform noise for the length of an edge, within ``+- e*edge_noise``
     :param name: Name of the stone
     :return:
@@ -48,21 +50,27 @@ def generate_regular_stone(x: Union[Tuple[float, float], float],
     v = np.array([a, b, c, d,  # lower 4 vertices
                   e, f, g, h])  # upper 4 vertices
 
-    if name:
+    if stone_type.lower() == 'stone':
         return Stone(v, name=name)
-    return Stone(v)
+    elif stone_type.lower() == 'normal':
+        return NormalStone(v, name=name)
+    elif stone_type.lower() == 'filling':
+        return FillingStone(v, name=name)
+    else:
+        raise ValueError
 
 
-def add_noise_to_vertices(vert, s=0.1):
+def add_noise_to_vertices(vert, s=0.1, random: 'np.random.Generator' = np.random.default_rng(),):
     """
     Adds noise to the vertices (to each coordinate separately)
 
     :param vert:
     :param s:
+    :param random: Generator for random numbers
     :return:
     """
     for v in vert:
         for c in v:
-            c += random.gauss(0, s)
+            c += random.normal(0, s)
 
     return Stone(vert, name='Noisy vertices')
