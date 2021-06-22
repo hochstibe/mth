@@ -12,17 +12,17 @@ import numpy as np
 from trockenmauer.stone import Boundary
 from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
-from trockenmauer.utils import pick_smaller_stone
+from trockenmauer.utils import pick_smaller_stone2, calc_smaller_stone_boundaries
 from trockenmauer.math_utils import Translation, Rotation, RZ_90
 from trockenmauer.validation import ValidatorNormal, ValidatorFill
 from trockenmauer.placement import solve_placement, random_xy_on_current_building_level, corner_placement, find_random_placement
 
 
-STONES = 30  # available stones
-STONES_FILL = 4
-STONES_LIM = 5  # number of (normal) stones to place
-FIREFLIES = 10
-ITERATIONS = 10
+STONES = 40  # available stones
+STONES_FILL = 0
+STONES_LIM = 8  # number of (normal) stones to place
+FIREFLIES = 15
+ITERATIONS = 15
 FILENAME = None
 SEED = None
 LEVEL_COVERAGE = 0.4
@@ -56,6 +56,7 @@ corner_placement(wall, 'right')
 
 start = time()
 placed_stones = 2
+placed_filling_stones = 0
 invalid_level_counter = 0
 invalid_level_update_counter = 0
 # for i in range(15):
@@ -88,28 +89,43 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
     if res.validation_result.intersection:
         # height is in z direction, if the stone is flat
         print('the stone intersects. stone area:', stone.aabb_area,
-              'intersection area', res.validation_result.intersection_area)
+              'intersection area', res.validation_result.intersection_area, res.validation_result.intersection_volume)
         print('Try a smaller stone')
-        # add the stone with intersection -> red
-        # wall.add_stone(stone, invalid_color='orange')
+        # add the stone with intersection -> orange
+        wall.add_stone(stone, invalid_color='orange')
+        intersections = []
+        # if res.validation_result.intersection_stones:
+        #     intersections.extend(res.validation_result.intersection_stones)
+        # if res.validation_result.intersection_boundary:
+        #     intersections.append(res.validation_result.intersection_boundary)
+        #     print('boundary intersection: dimensions',
+        #           res.validation_result.intersection_boundary.aabb_limits[1] - res.validation_result.intersection_boundary.aabb_limits[0])
+        new = calc_smaller_stone_boundaries(stone, res.validation_result.intersection_boundary,
+                                            res.validation_result.intersection_stones)
 
-        stone_index_small, rot = pick_smaller_stone(
-            stone, wall.normal_stones, overlapping_area=res.validation_result.intersection_area)
+        # stone_index_small, rot = pick_smaller_stone(
+        #     stone, wall.normal_stones, overlapping_area=res.validation_result.intersection_area)
+        stone_index_small, pos, rot = pick_smaller_stone2(wall.normal_stones, new)
 
         if not stone_index_small:  # no smaller stone available
             print('no smaller stone available -> filler? -> next level?')
             invalid_level_counter += 1
         else:
             stone = copy(wall.normal_stones[stone_index_small])
-            stone.transform(Rotation(rot))
-            init_pos = res.position * np.ones((int(FIREFLIES/2), 1))  # start with only half the fireflies
+            print('smaller stone limits:', stone.aabb_limits[1] - stone.aabb_limits[0])
+            # stone.transform(Rotation(rot))
+            # init_pos = res.position * np.ones((int(FIREFLIES/2), 1))  # start with only half the fireflies
+            if np.any(rot):
+                print('rotate smaller stone')
+                stone.transform(Rotation(rot))
+            init_pos = np.array([pos[0], pos[1], 0]) * np.ones((int(FIREFLIES/2), 1))  # start with only half the fireflies
             res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
                                   validator=validator_n, seed=random)
             stone.best_firefly = res
             if res.validation_result.intersection:
                 print('smaller stone also intersects...')
-                # add the stone with intersection -> orange
-                # wall.add_stone(stone, invalid_color='red')
+                # add the stone with intersection -> red
+                wall.add_stone(stone, invalid_color='red')
                 invalid_level_counter += 1
 
             else:
@@ -134,6 +150,8 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
             invalid_level_counter = 0
             # yay, stone is on the current level
             print(placed_stones, res.position, res.value, res.validation_result.intersection)
+            print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
+                  res.validation_result.delta_h)
 
             # Add to the wall (not as a valid stone
             # stone.alpha = 1
@@ -148,56 +166,66 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
     # stopping criteria for building on the current level and building the wall in general
     if invalid_level_counter >= 3 or wall.level_free < LEVEL_COVERAGE or not wall.normal_stones:
         print(f'------------- place filling stones --- {invalid_level_counter} {wall.level_free} ---------------------')
+        # Update the level limits
+        status = wall.update_level_limits()
+        if status:  # a stone was placed on the level
+            invalid_level_update_counter = 0
+        else:  # no normal stones placed on the current level
+            invalid_level_update_counter += 1
+            if invalid_level_update_counter >= 3:
+                running = False  # 3 times no stone placed on the level
+                # Todo: Place filling stones up to which level limits??
         # filling stones
         invalid_level_counter = 0
         valid_counter = 0
         while invalid_level_counter < 3 and wall.filling_stones:
             stone_index = random.choice(range(len(wall.filling_stones)))
             stone = copy(wall.filling_stones[stone_index])
+            print(f'stone {placed_filling_stones} - {stone.name} ----------------------------')
             # without improved starting positions -> often above level?
-            init_pos = np.array([find_random_placement(wall, random, wall.level_h[wall.level][0]) for _ in range(FIREFLIES)])
-            # init_pos = np.array([random_xy_on_current_building_level(wall, random) for _ in range(FIREFLIES)])
+            # init_pos = np.array([find_random_placement(wall, random, wall.level_h[wall.level][0]) for _ in range(FIREFLIES)])
+            init_pos = np.array([random_xy_on_current_building_level(wall, random) for _ in range(FIREFLIES)])
             res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
                                   validator=validator_f, seed=random)
+            stone.best_firefly = res
 
             # Todo: updating the level limits needed, if the fitness punishes higher than normal_stone?
             # 1. Place filling stones in holes -> from big to small like the normal stones, but different fitness
             # 2. Level with flat stones=
 
+            # 1. from big to small, fitness: if much too high +2, if a bit too high: ? (replace with smaller stone) if intersection
+
             if res.validation_result.intersection:
-                print(valid_counter, stone_index, stone.name, 'intersection')
+                print('intersection, value:', res.value, 'inters_volume (relative)',
+                      res.validation_result.intersection_volume / stone.aabb_volume, stone.name)
+                print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
+                      res.validation_result.delta_h)
                 invalid_level_counter += 1
                 wall.add_stone(stone, 'teal')
             elif not res.validation_result.on_level:
-                print(valid_counter, stone_index, stone.name, 'above level', res.validation_result.on_level)
+                print('above level', res.value, valid_counter, stone_index, stone.name, res.validation_result.on_level)
                 print(wall.level_h[wall.level], stone.aabb_limits[1][2])
+                print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
+                      res.validation_result.delta_h)
                 invalid_level_counter += 1
                 # stone.color = 'teal'
                 # wall.add_stone(stone)
 
             else:
                 valid_counter += 1
-                print(valid_counter, stone_index, stone.name, placed_stones, res.position, res.value)
+                print('valid filling stone')
+                print(placed_filling_stones, res.position, res.value, res.validation_result.intersection)
+                print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
+                      res.validation_result.delta_h)
+                # print(valid_counter, stone_index, stone.name, placed_stones, res.position, res.value)
                 stone.color = 'blue'
+                # Todo: adding the stone
                 wall.add_stone(stone)
                 wall.filling_stones.pop(stone_index)
 
         # go to next level or
         running = wall.next_level()
-        if running == 0:
-            # Good, continue
-            running = True
-        elif running == 1:
-            # no ne placed on current level
-            invalid_level_update_counter += 1
-            if invalid_level_update_counter <= 3:
-                running = False  # 3 times no stone placed on the level
-            else:
-                running = True  #
-        # elif running == 2:
-        else:
-            # Top reached or no stones
-            running = False
+        # Todo: how is the invalid_level_counter resetted?
         invalid_counter = 0
     """
     print(placed_stones, res.position, res.value, res.validation_result.intersection)
@@ -219,4 +247,4 @@ m, s = divmod(stop-start, 60)
 print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
 
 
-wall.replay(fireflies=False, save=FILENAME)
+wall.replay(fireflies=True, save=FILENAME)

@@ -65,7 +65,7 @@ class Wall:
 
         # Generate and align stones to the coordinate axis
         stones = [generate_regular_stone(normal_x_range, normal_y_range, normal_z_range, random, stone_type)
-                              for _ in range(n_normal_stones)]
+                  for _ in range(n_normal_stones)]
         if stone_type.lower() == 'normal':
             self.normal_stones = stones
             # Order by their volume
@@ -114,7 +114,7 @@ class Wall:
             stone.alpha = .1
         else:
             # valid stone
-            stone.alpha = 1
+            stone.alpha = .9
             self.stones.append(stone)
             i = len(self.stones) - 1  # index of the stone
             # Add the BB to the tree, the name of the stone is the index in the stones-list
@@ -129,6 +129,7 @@ class Wall:
     def get_stone_level(self, stone: 'Stone') -> Optional[int]:
         """
         Get the index of the building level for a (new) stone
+
         :param stone: new stone object
         """
         # returns 999, if no matching level found (above)
@@ -139,14 +140,33 @@ class Wall:
         else:
             return 999
 
-    def next_level(self) -> int:
+    def update_level_limits(self) -> bool:
+        """
+        Update h_max of the current level to the top of of the highest stone
+        """
+        h_min_old, h_max_old = self.level_h[self.level]
+        h_max_new = np.max([stone.aabb_limits[1][2] for stone in self.stones])
+        print(f'level {self.level}: {self.level_h[self.level]} min {h_min_old}, max {h_max_old}')
+        if len(self.normal_stones) == 0:
+            print('  no more stones available, cant pop one')
+            return False
+        if np.all(h_max_new == h_min_old):
+            print('  !!! no stone placed on the current level - remove the biggest stone')
+            print('  no level limits changed')
+            self.normal_stones.pop(0)
+            return False
+        else:
+            self.level_h[self.level] = [h_min_old, h_max_new]
+            print('Updating the current level limits to', self.level_h[self.level])
+            return True
+
+    def next_level(self) -> bool:
         """
         Calculate the boundaries of the current building level (z_max = highest stone).
         Start a new building level. It returns a status code
 
-        :return: 0: New level started,
-                 1: No stone was placed on the current level, no new level started
-                 2: Top of the wall reached, no new level started
+        :return: True: New level started, or retry current level
+                 False: Top of the wall reached or no more normal stones available, no new level started
         """
         # set h_max to the highest placed stone
         # returns True, while h_max is lower than the wall's limits
@@ -155,27 +175,25 @@ class Wall:
         print(f'level {self.level}: {self.level_h[self.level]} min {h_min_old}, max {h_max_old}')
         # if no stone was placed on the previous level, no updating is needed
         if len(self.normal_stones) == 0:
-            print('Top of the wall reached')
-            return 2
+            print('No more normal stones available')
+            return False
         if np.all(h_max_old == h_min_old):
-            print('  !!! no stone placed on the current level - remove the biggest stone')
-            self.normal_stones.pop(0)
-            return 1
+            print('no stone placed, dont go to next level (stone was removed with update_level_limits')
+            return True
         else:
-            # set a new level
+            # update old level
             self.level_h[self.level][1] = h_max_old
-            print(f'  level {self.level}: {self.level_h[self.level]}')
             # new level
             self.level += 1
             h_min_new = h_max_old
             h_max_new = h_max_old + np.max([stone.aabb_limits[1][2] for stone in self.normal_stones])
             if h_max_new > self.boundary.z:
                 print('Top of the wall reached')
-                return 2
+                return False
             self.level_h.append([h_min_new, h_max_new])
             print(f'new level {self.level}: {self.level_h[self.level]}')
 
-        return 0
+        return True
 
     def _init(self):
         """

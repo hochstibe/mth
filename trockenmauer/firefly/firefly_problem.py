@@ -113,7 +113,7 @@ class FireflyProblem:
             # Remove most fireflies after 3 iterations
             if iteration == 3:
                 self.__fireflies = np.sort(self.__fireflies)
-                self.__fireflies = self.__fireflies[:5]
+                self.__fireflies = self.__fireflies[:5].tolist()
         print(iteration, 'iterations, no update for', no_update)
 
         return best, history

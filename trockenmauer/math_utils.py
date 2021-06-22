@@ -3,7 +3,7 @@
 # Stefan Hochuli, 01.03.2021, math_utils.py
 # Utility functions, coordinates are treated as columns vectors
 
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 import numpy as np
 
 # 90° Rotation around z axis
@@ -352,6 +352,7 @@ def rotation_align_vectors(v1: np.ndarray, v2: np.ndarray):
 
     return r
 
+
 def tetra_volume(vertices, voxels):
     """
     Calculates the signed volume of each tetrahedron (voxel) and sums the volumes::
@@ -367,9 +368,28 @@ def tetra_volume(vertices, voxels):
     :return:
     """
 
-    # for v in voxels:
-    #     print(np.abs(np.linalg.det(np.vstack((vertices.T[v].T, np.ones(4))))))
-    # vol_abs = sum([np.abs(np.linalg.det(np.vstack((vertices.T[v].T, np.ones(4))))) for v in voxels]) / 6
-    # the tetras after generating with tetgen result in negative volumes --> change the order with [::-1]
     vol_sig = np.sum([np.linalg.det(np.vstack((vertices.T[v].T[::-1], np.ones(4)))) for v in voxels]) / 6
+
     return vol_sig
+
+
+def aabb_overlap(limits: 'np.ndarray', other_limits: 'np.ndarray') -> Optional['np.ndarray']:
+    """
+    calculates the overlapping region. if no overlap, it returns None
+
+    :param limits: aabb as [[x_min, y_min, ...], [x_max, y_max, ...]]
+    :param other_limits: other aabb
+    :return: limits of the intersection or None
+    """
+
+    # minimum of both maxima; maximum of both minima
+    overlap_min = np.max(np.array([limits[0], other_limits[0]]), axis=0)
+    overlap_max = np.min(np.array([limits[1], other_limits[1]]), axis=0)
+
+    # difference is positive, if there is an overlap
+    diff = overlap_max - overlap_min
+
+    if np.any(diff <= 0):  # todo: ?
+        return None
+
+    return np.array([overlap_min, overlap_max])

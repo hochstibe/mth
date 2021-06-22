@@ -3,7 +3,7 @@
 # Stefan Hochuli, 22.05.21, validation.py
 #
 
-from typing import TYPE_CHECKING, Tuple, Union, List
+from typing import TYPE_CHECKING, Tuple, Union, List, Optional
 from dataclasses import dataclass
 
 import numpy as np
@@ -62,25 +62,27 @@ class Validator:
         return intersections
 
     @staticmethod
-    def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh') -> Union[None, 'pymesh.Mesh']:
+    def _mesh_intersection(mesh1: 'pymesh.Mesh', mesh2: 'pymesh.Mesh'
+                           ) -> Tuple[Union[None, 'pymesh.Mesh'], Union[None, 'pymesh.Mesh']]:
         """
         Intersects a mesh with another mesh
 
         :param mesh1: first mesh
         :param mesh2: second mesh
-        :return: intersecting mesh or None
+        :return: intersecting mesh + valid mesh or None, None
         """
         # engine: igl (auto) fails on empty intersection, cgal requires closed meshes
         # cork always works, but is more experimental
         try:
             intersection = pymesh.boolean(mesh1, mesh2, "intersection", engine='cgal')
+            valid = pymesh.boolean(mesh1, mesh2, "difference", engine='cgal')
         except RuntimeError:
-            intersection = None
+            intersection, valid = None, None
 
-        return intersection
+        return intersection, valid
 
     def _intersection_boundary(self, stone: 'Stone', wall: 'Wall'
-                               ) -> Tuple[bool, Union[None, 'Intersection']]:
+                               ) -> Tuple[bool, Optional['Intersection']]:
         """
         Intersects a stone with the boundary.
 
@@ -88,14 +90,16 @@ class Validator:
         :param wall: Boundary object
         :return: Status: True (there is an intersection) / False (no intersection; intersection mesh
         """
-        intersection = self._mesh_intersection(stone.mesh, wall.boundary.mesh_solid_sides)
+        intersection, valid_stone = self._mesh_intersection(stone.mesh, wall.boundary.mesh_solid_sides)
         if intersection and np.any(intersection.vertices):
             # run tetrahedalization
             self.tetgen.points = intersection.vertices
             self.tetgen.triangles = intersection.faces
             self.tetgen.run()
             intersection = self.tetgen.mesh
-            intersection = Intersection(mesh=intersection)
+
+            valid = np.array([np.min(valid_stone.vertices, axis=0), np.max(valid_stone.vertices, axis=0)])
+            intersection = Intersection(mesh=intersection, valid_stone_aabb=valid)
             return True, intersection
 
         else:
@@ -316,10 +320,10 @@ class ValidatorNormal(Validator):
         results = ValidationResult()
 
         if self.intersection_boundary:
-            intersects, details = self._intersection_boundary(stone, wall)
+            intersects, b_intersection = self._intersection_boundary(stone, wall)
             if intersects:
                 passed = False
-                results.intersection_boundary = details
+                results.intersection_boundary = b_intersection
 
         if self.intersection_stones:
             intersects, details = self._intersection_stones(stone, wall)
@@ -413,14 +417,16 @@ class ValidatorFill(Validator):
         # Get the height difference to the closest normal stone
         # Higher than the stone -> bad
         # lower than the stone -> ok, but equal height would be best
-        close_st = self._distance2closest_stone(stone, wall, 5)
+        close_st = self._closest_stone(stone, wall, 5)
         normal_stones = [st for st in close_st if isinstance(st, NormalStone)]
 
         if normal_stones:
             delta_h = normal_stones[0].aabb_limits[1, 2] - stone.aabb_limits[1, 2]
+            # print('delta_h', delta_h)
         else:
-            print('!!! NO CLOSE NORMAL STONE FOUND !!!', len([st.__class__.__name__ for st in close_st]), len(close_st), len(normal_stones))
-            delta_h = 0
+            # print('!!! NO CLOSE NORMAL STONE FOUND !!!', [st.__class__.__name__ for st in close_st], len(close_st), len(normal_stones))
+            delta_h = -1
+            # Todo: same result as 2 equally high stones --> return -1?
 
         return delta_h
 
@@ -430,10 +436,10 @@ class ValidatorFill(Validator):
         results = ValidationResult()
 
         if self.intersection_boundary:
-            intersects, details = self._intersection_boundary(stone, wall)
+            intersects, b_intersection = self._intersection_boundary(stone, wall)
             if intersects:
                 passed = False
-                results.intersection_boundary = details
+                results.intersection_boundary = b_intersection
 
         if self.intersection_stones:
             intersects, details = self._intersection_stones(stone, wall)
@@ -446,6 +452,7 @@ class ValidatorFill(Validator):
             results.volume_below_stone = v
 
         if self.distance2closest_stone:
+            # Todo: If no closest stone -> no stone on the same height --> bad for filling stones?
             results.distance2closest_stone = self._distance2closest_stone(stone, wall, 2)
 
         if self.on_level:
@@ -483,8 +490,14 @@ class ValidatorFill(Validator):
         # distance to the closest stone on the same level
         if self.distance2closest_stone:
             # no penalty, if there is no stone on the same level
-            for dist in res.distance2closest_stone:
-                score += (1 + 5 * dist)**2 - 1
+            # for dist in res.distance2closest_stone:
+            #     score += (1 + 5 * dist)**2 - 1
+            # score += (d1² - d2) if the difference is not too high (dont count far away stones
+            d2c = res.distance2closest_stone
+            if len(d2c) == 1 or d2c[0] - d2c[1] > .05:
+                score += (1 + d2c[0] * 5)**2 - 1
+            else:
+                score += (1 + d2c[0] * 5)**2 - 1 - d2c[1] * 5
 
         # Punish stones that are not on the current level (or lower=
         # if not res.on_level:
@@ -492,11 +505,16 @@ class ValidatorFill(Validator):
         # res.score = score
 
         if self.delta_h:
-            if res.delta_h < 0:  # new stone is higher than the closest normal stone
-                res.score += 2
-            else:
-                res.score += res.delta_h*10
+            if res.delta_h > 0:  # new stone is lower
+                score += res.delta_h
+            else:  # new stone is higher than the closest normal stone
+                score += 2
+            # if res.delta_h < 0:  # new stone is higher than the closest normal stone
+            #     res.score += 2
+            # else:
+            #     res.score += res.delta_h*10
 
+        res.score = score
         return res
 
 
@@ -506,8 +524,8 @@ class ValidationResult:
     Storing all validation results. The total intersection volume gets automatically updated,
     if a boundary intersection or stones intersection is set.
     """
-    __intersection_boundary: 'Intersection' = False  # Intersection with the boundary
-    __intersection_stones: List['Intersection'] = False  # All Intersections with other stones
+    __intersection_boundary: 'Intersection' = None  # Intersection with the boundary
+    __intersection_stones: List['Intersection'] = ()  # All Intersections with other stones
     _intersection: bool = False  # whether there is any intersection or not
     _intersection_volume: float = 0  # total intersection volume
     _intersection_area: float = 0  # total intersection area
@@ -560,7 +578,9 @@ class ValidationResult:
     def intersection_stones(self, new_intersections: List['Intersection']):
         self.__intersection_stones = new_intersections
         self._intersection = True
-        map(self.update_total_volume, new_intersections)
+        for i in new_intersections:
+            self.update_total_volume(i)
+        # map(self.update_total_volume, new_intersections)
         self._intersection_volume_s += np.sum([i.aabb_volume for i in new_intersections])
 
     def update_total_volume(self, new_intersection: 'Intersection'):
@@ -573,3 +593,7 @@ class ValidationResult:
             print('intersection but no volume added')
         # update intersection area
         self._intersection_area += new_intersection.aabb_area
+        # print('update total_volume with', 'new volume',
+        #       new_intersection.mesh_volume if new_intersection.mesh_volume else new_intersection.aabb_volume,
+        #       'total vol', self._intersection_volume,
+        #       'new area', new_intersection.aabb_area, 'total area', self._intersection_area)

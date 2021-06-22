@@ -117,6 +117,7 @@ def blocked_area(xyz: np.ndarray, wall: 'Wall'):
     blocked = np.sum(np.prod(limits[:, 3:5] - limits[:, :2], axis=1))
     # ratio of blocked area to total area
     # blocked = blocked / np.prod(bb[1][:2] - bb[2][:2])
+    # Todo: only normal stones block the area
 
     # if the coordinate is within the xy limits of another stone (boolean index)
     in_stones = np.all((limits[:, :2] <= xyz[:2]) & (limits[:, 3:5] >= xyz[:2]), axis=1)

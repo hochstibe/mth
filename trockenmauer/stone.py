@@ -10,7 +10,8 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import pymesh
 
-from .math_utils import order_clockwise, pca, rot_matrix, RotationTranslation, Rotation, Transformation, tetra_volume
+from .math_utils import (order_clockwise, pca, rot_matrix, RotationTranslation, Rotation, Transformation,
+                         tetra_volume, aabb_overlap)
 
 if TYPE_CHECKING:
     from .firefly import Iteration, Firefly
@@ -114,20 +115,7 @@ class Geometry:
         :param other_limits: np.arr
         :return: limits
         """
-
-        # minimum of both maxima; maximum of both minima
-        overlap_min = np.max(np.array([self.aabb_limits[0], other_limits[0]]), axis=0)
-        overlap_max = np.min(np.array([self.aabb_limits[1], other_limits[1]]), axis=0)
-
-        # difference is positive, if there is an overlap
-        diff = overlap_max - overlap_min
-
-        if np.any(diff <= 0):  # todo: ?
-            # adjacent bb, the tree returns an overlap
-            # print('No overlap, diff:', diff)
-            return None
-
-        return np.array([overlap_min, overlap_max])
+        return aabb_overlap(self.aabb_limits, other_limits)
 
     def add_shape_to_ax(self, ax):
         # Plot the points (with Poly3DCollection, the extents of the plot is not calculate
@@ -147,10 +135,14 @@ class Intersection(Geometry):
     Intersection of geometries, init with a mesh or with bb_limits
     """
     mesh_volume: float = None
+    valid_stone_aabb: 'np.ndarray' = None  # If it is a boundary intersection, the aabb of the valid part
 
-    def __init__(self, mesh: 'pymesh.Mesh' = None, bb_limits: 'np.ndarray' = None, name: str = None):
+    def __init__(self, mesh: 'pymesh.Mesh' = None, bb_limits: 'np.ndarray' = None, name: str = None,
+                 valid_stone_aabb: 'np.ndarray' = None):
         # if there is a mesh, __init__ adds the mesh, calculates triangle values and the aabb
         super().__init__(mesh, name)
+        self.valid_stone_aabb = valid_stone_aabb
+        self.color = 'purple'
 
         if np.any(bb_limits):
             self.aabb_limits = bb_limits
