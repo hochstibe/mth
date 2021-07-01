@@ -106,14 +106,17 @@ class Wall:
         #     # -> for the moment, to check intersections, all individual stones have to be checked
 
         # Add the stone to the list to keep track of the individual stones
-        self.stones_vis.append(stone)
 
         if stone.best_firefly and stone.best_firefly.validation_result.intersection:
+            # Add the stone to the visualization
+            # self.stones_vis.append(stone)
             # stone intersects, don't add to tree
             stone.color = invalid_color
             stone.alpha = .1
         else:
             # valid stone
+            # Add the stone to the visualization
+            self.stones_vis.append(stone)
             stone.alpha = .9
             self.stones.append(stone)
             i = len(self.stones) - 1  # index of the stone
@@ -131,9 +134,11 @@ class Wall:
         Get the index of the building level for a (new) stone
 
         :param stone: new stone object
+        :return: Index of the level of the stone
         """
         # returns 999, if no matching level found (above)
-        z = stone.aabb_limits[1][2]
+        z = stone.aabb_limits[1][2]  # top z of the stone
+        # level limits, if the top of the stone is within
         limits = [lim for lim in self.level_h if lim[0] < z <= lim[1]]
         if limits:
             return self.level_h.index(limits[0])

@@ -498,6 +498,8 @@ class ValidatorFill(Validator):
                 score += (1 + d2c[0] * 5)**2 - 1
             else:
                 score += (1 + d2c[0] * 5)**2 - 1 - d2c[1] * 5
+                # Distance: 2² - 4¹ = 0 --> same as if both distances == 0
+                # if both are added separately -> only one distance is better than having 2...
 
         # Punish stones that are not on the current level (or lower=
         # if not res.on_level:
@@ -506,9 +508,11 @@ class ValidatorFill(Validator):
 
         if self.delta_h:
             if res.delta_h > 0:  # new stone is lower
-                score += res.delta_h
-            else:  # new stone is higher than the closest normal stone
-                score += 2
+                # score += res.delta_h
+                pass
+            else:  # new stone is higher than the closest normal stone (delta_h negative)
+                score += 1 - res.delta_h
+                # smallest stone: 1cm -> 2cm too high -> score += 1
             # if res.delta_h < 0:  # new stone is higher than the closest normal stone
             #     res.score += 2
             # else:
@@ -593,7 +597,3 @@ class ValidationResult:
             print('intersection but no volume added')
         # update intersection area
         self._intersection_area += new_intersection.aabb_area
-        # print('update total_volume with', 'new volume',
-        #       new_intersection.mesh_volume if new_intersection.mesh_volume else new_intersection.aabb_volume,
-        #       'total vol', self._intersection_volume,
-        #       'new area', new_intersection.aabb_area, 'total area', self._intersection_area)

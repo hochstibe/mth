@@ -57,6 +57,7 @@ def plot_stones(stones: List['Stone']):
 
 if __name__ == '__main__':
     # stones = [generate_regular_stone(0.2, 0.1, 0.1, name=str(i)) for i in range(10)]
-    stoners = [generate_regular_stone(0.3, 0.15, 0.1, edge_noise=0.5, scale=[1, 2]) for i in range(10)]
-
+    stoners = [generate_regular_stone((.1, .3), (.075, .2), (.05, .15), edge_noise=0.5) for i in range(1)]
+    for stone in stoners:
+        stone.alpha = .2
     plot_stones(stoners)

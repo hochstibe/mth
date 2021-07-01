@@ -14,58 +14,55 @@ if TYPE_CHECKING:
 
 
 def calc_smaller_stone_boundaries(invalid_stone: 'Stone',
-                                  intersection_boundary: 'Intersection', intersection_stones: List['Intersection']):
+                                  intersection_boundary: 'Intersection', intersection_stones: List['Intersection'],
+                                  reduce_z: Optional[float] = None) -> 'np.ndarray':
     """
     Calculate the max_bb for a stone and its intersections (in x and y direction)
-    Greedy calculation, reduces for each intersection -> no global calculation
+    Greedy calculation, reduces for each intersection -> no global calculation.
+    If z_max is reduced by reduce_z
     """
     x_min, y_min, z_min, x_max, y_max, z_max = invalid_stone.aabb_limits.flatten()
     if intersection_boundary:
-        # hit = aabb_overlap(invalid_stone.aabb_limits, intersection_boundary.aabb_limits)
-        # if np.any(hit):
-        #     x_min, y_min, z_min, x_max, y_max, z_max = hit.flatten()
-        #     print('  this boundary still intersects')
         x_min, y_min, z_min, x_max, y_max, z_max = intersection_boundary.valid_stone_aabb.flatten()
-        print('boundary intersection: valid part of the stone:')
-        print(intersection_boundary.valid_stone_aabb)
+        # print('boundary intersection: valid part of the stone:')
+        # print(intersection_boundary.valid_stone_aabb)
 
-    print(len(intersection_stones), 'intersection stones')
+    # print(len(intersection_stones), 'intersection stones')
     for n, i in enumerate(intersection_stones):
-        print('intersection', n)
+        # print('intersection', n)
         ix_min, iy_min, iz_min, ix_max, iy_max, iz_max = i.aabb_limits.flatten()
 
         hit = aabb_overlap(np.array([[x_min, y_min, z_min], [x_max, y_max, z_max]]), i.aabb_limits)
 
         if np.any(hit):
-            print('  this stone still intersects')
-
+            # print('  this stone still intersects')
             # List the possible reductions of the aabb limits
             reductions = list()  # [[name, amount, area after reduction], ...]
 
             # x_max
             if x_min < ix_min < x_max:
                 reductions.append(['r_x_max', x_max - ix_min, (ix_min - x_min) * (y_max - y_min)])
-                print('  reduce x_max')
+                # print('  reduce x_max')
             # y_max
             if y_min < iy_min < y_max:
                 reductions.append(['r_y_max', y_max - iy_min, (iy_min - y_min) * (x_max - x_min)])
-                print('  reduce y_max')
+                # print('  reduce y_max')
             # x_min
             if x_max > ix_max > x_min:
                 reductions.append(['r_x_min', ix_max - x_min, (x_max - ix_max) * (y_max - y_min)])
-                print('  reduce x_min')
+                # print('  reduce x_min')
             # y_min
             if y_max > iy_max > y_min:
                 reductions.append(['r_y_min', iy_max - y_min, (y_max - iy_max) * (x_max - x_min)])
-                print('  reduce y_min')
+                # print('  reduce y_min')
 
-            print(reductions)
+            # print(reductions)
 
             red = reductions[0]
             for r in reductions:
                 if r[2] > red[2]:
                     red = r
-            print('  reduce', red)
+            # print('  reduce', red)
 
             if red[0] == 'r_x_min':
                 x_min += red[1]
@@ -77,15 +74,19 @@ def calc_smaller_stone_boundaries(invalid_stone: 'Stone',
                 y_max -= red[1]
 
         else:
-            print('  no intersection anymore')
+            # print('  no intersection anymore')
+            pass
 
-    new = np.array([[x_min, y_min], [x_max, y_max]])
+    if reduce_z:
+        z_max -= reduce_z
 
-    print('calc_smaller_stone_boundaries')
-    print('old:', invalid_stone.aabb_limits[1] - invalid_stone.aabb_limits[0])
-    print(invalid_stone.aabb_limits)
-    print('new:', new[1] - new[0])
-    print(new)
+    new = np.array([[x_min, y_min, z_min], [x_max, y_max, z_max]])
+
+    # print('calc_smaller_stone_boundaries')
+    # print('old:', invalid_stone.aabb_limits[1] - invalid_stone.aabb_limits[0])
+    # print(invalid_stone.aabb_limits)
+    # print('new:', new[1] - new[0])
+    # print(new)
 
     return new
 
@@ -93,10 +94,11 @@ def calc_smaller_stone_boundaries(invalid_stone: 'Stone',
 def pick_smaller_stone2(stones: List['Stone'], new_lim: 'np.ndarray') -> Tuple[Optional[int], 'np.ndarray', 'np.ndarray']:
     # return the index to the list of stones for the smaller stone, the initial position and the rotation
     # stones are ordered by their volume or area --> the first match is good
-    x, y = new_lim[1] - new_lim[0]
+    x, y, z = new_lim[1] - new_lim[0]
 
     target_l = x
     target_w = y
+    target_h = z
     position = np.mean(new_lim, axis=0)
     rotation = None
 
@@ -106,7 +108,7 @@ def pick_smaller_stone2(stones: List['Stone'], new_lim: 'np.ndarray') -> Tuple[O
         target_w = x
 
     try:
-        match = next(s for s in stones if s.length <= target_l and s.width <= target_w)
+        match = next(s for s in stones if s.length <= target_l and s.width <= target_w and s.height <= target_h)
         print(match.length, match.width)
     except StopIteration:
         print('no smaller stone in the list')
