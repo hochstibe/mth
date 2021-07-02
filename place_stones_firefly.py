@@ -19,9 +19,9 @@ from trockenmauer.placement import solve_placement, random_xy_on_current_buildin
 
 
 STONES = 30  # available stones
-STONES_FILL = 30
-STONES_LIM = 30  # number of (normal) stones to place
-STONES_FILL_LIM = 30  # number of filling stones to place
+STONES_FILL = 0
+STONES_LIM = 10  # number of (normal) stones to place
+STONES_FILL_LIM = 0  # number of filling stones to place
 FIREFLIES = 20
 ITERATIONS = 20
 FILENAME = None
@@ -301,4 +301,4 @@ m, s = divmod(stop-start, 60)
 print(f"Successfully placed {len(wall.stones)} stones in {int(m)}'{round(s, 1)}''.")
 
 
-wall.replay(fireflies=False, save=FILENAME)
+wall.replay(fireflies=True, save=FILENAME)

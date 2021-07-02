@@ -1,6 +1,6 @@
 # FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
-# Stefan Hochuli, 02.03.21, test_sim.py
+# Stefan Hochuli, 02.03.21, place_stones_yade.py
 #
 
 from yade import qt, polyhedra_utils, utils
