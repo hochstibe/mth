@@ -5,8 +5,8 @@
 
 from .stone import Boundary, Stone, NormalStone, FillingStone, Intersection
 from .wall import Wall
-from .validation import ValidatorNormal, ValidatorFill
+from .fitness import Fitness, FitnessNormal, FitnessFill
 
 
 __all__ = ['Boundary', 'Stone', 'NormalStone', 'FillingStone', 'Intersection',
-           'Wall', 'ValidatorNormal', 'ValidatorFill']
+           'Wall', 'Fitness', 'FitnessNormal', 'FitnessFill']

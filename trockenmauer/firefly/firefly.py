@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..validation import ValidationResult
+    from ..fitness import ValidationResult
 
 
 class Firefly:

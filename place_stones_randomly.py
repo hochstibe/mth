@@ -13,7 +13,7 @@ from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.plot import set_axes_equal
 from trockenmauer.math_utils import Translation
 from trockenmauer.placement import find_placement
-from trockenmauer.validation import Validator
+from trockenmauer.fitness import Fitness
 
 
 STONES = 30
@@ -24,10 +24,10 @@ fig = plt.figure()
 ax = Axes3D(fig, auto_add_to_figure=False)
 fig.add_axes(ax)
 
-validator = Validator(intersection_boundary=True, intersection_stones=True,
-                      distance2boundary=True, volume_below_stone=True,
-                      distance2closest_stone=True
-                      )
+validator = Fitness(intersection_boundary=True, intersection_stones=True,
+                    distance2boundary=True, volume_below_stone=True,
+                    distance2closest_stone=True
+                    )
 
 
 def init_func():

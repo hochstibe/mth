@@ -1,6 +1,6 @@
 # FHNW - Institut für Geomatik: Masterthesis
 # Maschinelles Lernen für die digitale Konstruktion von Trockenmauern
-# Stefan Hochuli, 22.05.21, validation.py
+# Stefan Hochuli, 22.05.21, fitness.py
 #
 
 from typing import TYPE_CHECKING, Tuple, Union, List, Optional
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from trockenmauer.wall import Wall
 
 
-class Validator:
+class Fitness:
     """
     Validation functions for a placement
 
@@ -284,7 +284,7 @@ class Validator:
         return score
 
 
-class ValidatorNormal(Validator):
+class FitnessNormal(Fitness):
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
                  distance2boundary=False, volume_below_stone=False, distance2closest_stone=False,
@@ -392,7 +392,7 @@ class ValidatorNormal(Validator):
         return res
 
 
-class ValidatorFill(Validator):
+class FitnessFill(Fitness):
 
     def __init__(self, intersection_boundary=False, intersection_stones=False,
                  volume_below_stone=False, distance2closest_stone=False,

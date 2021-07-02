@@ -14,7 +14,7 @@ from trockenmauer.wall import Wall
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.plot import set_axes_equal
 from trockenmauer.math_utils import Translation
-from trockenmauer.validation import Validator
+from trockenmauer.fitness import Fitness
 from trockenmauer.placement import xy_fixed_z
 from swarmlib.firefly_problem import FireflyProblem
 
@@ -28,10 +28,10 @@ ax = Axes3D(fig, auto_add_to_figure=False)
 fig.add_axes(ax)
 start = time()
 
-validator = Validator(intersection_boundary=True, intersection_stones=True,
-                      distance2boundary=True, volume_below_stone=True,
-                      # distance2closest_stone=True
-                      )
+validator = Fitness(intersection_boundary=True, intersection_stones=True,
+                    distance2boundary=True, volume_below_stone=True,
+                    # distance2closest_stone=True
+                    )
 
 
 def init_func():

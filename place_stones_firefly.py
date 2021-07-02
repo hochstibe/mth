@@ -11,11 +11,10 @@ import numpy as np
 
 from trockenmauer.stone import Boundary
 from trockenmauer.wall import Wall
-from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.utils import pick_smaller_stone2, calc_smaller_stone_boundaries
-from trockenmauer.math_utils import Translation, Rotation, RZ_90
-from trockenmauer.validation import ValidatorNormal, ValidatorFill
-from trockenmauer.placement import solve_placement, random_xy_on_current_building_level, corner_placement, find_random_placement
+from trockenmauer.math_utils import Rotation, RZ_90
+from trockenmauer.fitness import FitnessNormal, FitnessFill
+from trockenmauer.placement import solve_placement, random_xy_on_current_building_level, corner_placement
 
 
 STONES = 30  # available stones
@@ -34,18 +33,17 @@ random = np.random.default_rng(SEED)
 boundary = Boundary(x=1, y=.5, z=.5, batter=.1)
 wall = Wall(boundary)
 
-validator_n = ValidatorNormal(intersection_boundary=True, intersection_stones=True,
-                              distance2boundary=True, volume_below_stone=True,
-                              distance2closest_stone=True, on_level=True
-                              )
-validator_f = ValidatorFill(intersection_boundary=True, intersection_stones=True,
-                            volume_below_stone=True,
-                            distance2closest_stone=True, on_level=True,
-                            delta_h=True)
+validator_n = FitnessNormal(intersection_boundary=True, intersection_stones=True,
+                            distance2boundary=True, volume_below_stone=True,
+                            distance2closest_stone=True, on_level=True
+                            )
+validator_f = FitnessFill(intersection_boundary=True, intersection_stones=True,
+                          volume_below_stone=True,
+                          distance2closest_stone=True, on_level=True,
+                          delta_h=True)
 rz90 = Rotation(rotation=RZ_90, center=np.zeros(3))
 
 # generate all stones and sort them with decreasing volume
-# .25x.15x.1 with +- *=0.5
 wall.init_stones(STONES, (.1, .3), (.075, .2), (.05, .15), random, 'normal')
 # create filling stones
 wall.init_stones(STONES_FILL, (.05, .15), (.05, .15), (.01, .075), random, 'filling')
@@ -63,7 +61,6 @@ invalid_level_update_counter = 0  # counts failed new levels (no stone placed on
 running = True
 while placed_stones < STONES_LIM and wall.normal_stones and running:
 
-    # print(f'stone {placed_stones} -----------------------------')
     # Pick the stones from biggest to smallest -> pick one of the 25% biggest stones
     stone_index = random.integers(0, np.max((1, np.round(len(wall.normal_stones)/4))))
 
@@ -76,11 +73,6 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
     # Find a placement
     print('free area:', wall.level_free, wall.level_free*wall.level_area, 'stone area', stone.aabb_area)
     init_pos = np.array([random_xy_on_current_building_level(wall, random) for _ in range(FIREFLIES)])
-    # if np.all(init_pos[:, 2] == wall.level_h[wall.level][0]):
-    #     print('all placement on the current building level', (init_pos[init_pos[:, 2] == wall.level_h[wall.level][0]])[:, 2].flatten())
-    # else:
-    #     print('some placements on higher level after 5 tries')
-    #     print(init_pos[init_pos[:, 2] == wall.level_h[wall.level][0]])
 
     res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
                           validator=validator_n, seed=random)
@@ -94,18 +86,10 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
         # add the stone with intersection -> orange
         wall.add_stone(stone, invalid_color='orange')
         intersections = []
-        # if res.validation_result.intersection_stones:
-        #     intersections.extend(res.validation_result.intersection_stones)
-        # if res.validation_result.intersection_boundary:
-        #     intersections.append(res.validation_result.intersection_boundary)
-        #     print('boundary intersection: dimensions',
-        #           res.validation_result.intersection_boundary.aabb_limits[1] - res.validation_result.intersection_boundary.aabb_limits[0])
         new = calc_smaller_stone_boundaries(stone, res.validation_result.intersection_boundary,
                                             res.validation_result.intersection_stones,
                                             # stone could be higher (up to the level limits) -- -> +
                                             stone.aabb_limits[1, 2] - wall.level_h[wall.level][1])
-        # stone_index_small, rot = pick_smaller_stone(
-        #     stone, wall.normal_stones, overlapping_area=res.validation_result.intersection_area)
         stone_index_small, pos, rot = pick_smaller_stone2(wall.normal_stones, new)
 
         if not stone_index_small:  # no smaller stone available
@@ -114,8 +98,6 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
         else:
             stone = copy(wall.normal_stones[stone_index_small])
             print('smaller stone limits:', stone.aabb_limits[1] - stone.aabb_limits[0])
-            # stone.transform(Rotation(rot))
-            # init_pos = res.position * np.ones((int(FIREFLIES/2), 1))  # start with only half the fireflies
             if np.any(rot):
                 print('rotate smaller stone')
                 stone.transform(Rotation(rot))
@@ -135,29 +117,13 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
                 invalid_level_counter = 0
                 print('smaller stone without intersection')
                 print(stone_index_small, res.position, res.value)
-                # t = Translation(translation=res.position - stone.bottom_center)
-                # stone.transform(transformation=t)
-                # stone.alpha = 1
                 wall.add_stone(stone)
                 wall.normal_stones.pop(stone_index_small)
                 placed_stones += 1
-            # If the length is the limiting factor, pick a stone with equal width, but reduce the length
-
-            # if the width is the limiting factor, pick a stone with equal length, but reduce width
-
-            # if both are limiting: -> pick one with the needed area
-            # Maybe add a rotation in the first 3 iterations and use the better of 2 solutions per position
-            # Maybe add the rotation only in the initial positions
     else:  # No intersection
         if res.validation_result.on_level:
             invalid_level_counter = 0
-            # yay, stone is on the current level
-            # print(placed_stones, res.position, res.value, res.validation_result.intersection)
-            # print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
-            #       res.validation_result.delta_h)
-
             # Add to the wall (not as a valid stone
-            # stone.alpha = 1
             wall.add_stone(stone)
             wall.normal_stones.pop(stone_index)
             placed_stones += 1
@@ -184,22 +150,13 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
         invalid_filling_counter = 0
         valid_counter = 0
         while invalid_filling_counter < 3 and wall.filling_stones and placed_filling_stones < STONES_FILL_LIM:
-            # stone_index = random.choice(range(len(wall.filling_stones)))
             stone_index = random.integers(0, np.max((1, np.round(len(wall.filling_stones)/4))))
             stone = copy(wall.filling_stones[stone_index])
             print(f'stone {placed_filling_stones} - {stone.name} ----------------------------')
-            # without improved starting positions -> often above level?
-            # init_pos = np.array([find_random_placement(wall, random, wall.level_h[wall.level][0]) for _ in range(FIREFLIES)])
             init_pos = np.array([random_xy_on_current_building_level(wall, random) for _ in range(FIREFLIES)])
             res = solve_placement(wall, stone, n_fireflies=init_pos, n_iterations=ITERATIONS,
                                   validator=validator_f, seed=random)
             stone.best_firefly = res
-
-            # Todo: updating the level limits needed, if the fitness punishes higher than normal_stone?
-            # 1. Place filling stones in holes -> from big to small like the normal stones, but different fitness
-            # 2. Level with flat stones=
-
-            # 1. from big to small, fitness: if much too high +2, if a bit too high: ? (replace with smaller stone) if intersection
 
             if res.validation_result.intersection or res.validation_result.delta_h < 0:
                 if res.validation_result.intersection:
@@ -248,9 +205,6 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
                         invalid_filling_counter = 0
                         print('smaller stone without intersection')
                         print(stone_index_small, res.position, res.value)
-                        # t = Translation(translation=res.position - stone.bottom_center)
-                        # stone.transform(transformation=t)
-                        # stone.alpha = 1
                         wall.add_stone(stone)
                         wall.filling_stones.pop(stone_index_small)
                         placed_filling_stones += 1
@@ -262,22 +216,13 @@ while placed_stones < STONES_LIM and wall.normal_stones and running:
                 print(placed_filling_stones, res.position, res.value, res.validation_result.intersection)
                 print(res.validation_result.intersection_volume, res.validation_result.distance2closest_stone,
                       res.validation_result.delta_h)
-                # print(valid_counter, stone_index, stone.name, placed_stones, res.position, res.value)
                 stone.color = 'blue'
-                # Todo: adding the stone
                 wall.add_stone(stone)
                 wall.filling_stones.pop(stone_index)
 
         # go to next level or
         running = wall.next_level()
-        # Todo: how is the invalid_level_counter resetted?
         invalid_counter = 0
-    """
-    print(placed_stones, res.position, res.value, res.validation_result.intersection)
-    wall.add_stone(stone)
-    wall.normal_stones.pop(stone_index)
-    placed_stones += 1
-    """
 
 print('\nStopping criteria (main loop, AND):', placed_stones < STONES_LIM, running)
 print('  Goto next lvl/filling, IF OR', invalid_level_counter >= 3,  wall.level_free < LEVEL_COVERAGE)
@@ -292,8 +237,6 @@ print(f'Wall Volume: {wall_vol} (up to highest stones). Boundary Volume: {wall.b
 stone_vol = np.sum([stone.aabb_volume for stone in wall.stones])
 print(f'{len(wall.stones)} Stones Volume: {stone_vol}')
 print(stone_vol / wall.boundary.volume, stone_vol / wall_vol)
-
-
 
 # Stop criteria
 stop = time()

@@ -15,7 +15,7 @@ from yade.wrapper import (
 )
 import numpy as np
 
-from trockenmauer import Wall, Boundary, Validator
+from trockenmauer import Wall, Boundary, Fitness
 from trockenmauer.placement import solve_placement
 from trockenmauer.generate_stones import generate_regular_stone
 from trockenmauer.math_utils import Rotation, RotationTranslation, RZ_90

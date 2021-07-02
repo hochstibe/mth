@@ -11,11 +11,11 @@ from .firefly import FireflyProblem
 from .math_utils import RZ_90, RotationTranslation
 
 if TYPE_CHECKING:
-    from . import Wall, Stone, Validator
+    from . import Wall, Stone, Fitness
 
 
 def solve_placement(wall: 'Wall', stone: 'Stone', n_fireflies: Union[int, np.ndarray, Iterable],
-                    n_iterations: int, validator: 'Validator',
+                    n_iterations: int, validator: 'Fitness',
                     seed: Union[np.random.Generator, any]):
     """
     Find the optimal placement
